@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Private Kanban</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar compact-topbar">
+    <div>
+      <h1>Private Kanban</h1>
+      <p class="muted small-text">Signed in as <strong><%= currentUser %></strong></p>
+    </div>
+
+    <div class="topbar-actions">
+      <form id="addBoardForm" class="inline-form">
+        <input type="text" id="newBoardName" placeholder="New board name" required />
+        <button type="submit" class="tiny-button">Add board</button>
+      </form>
+
+      <form method="POST" action="/logout">
+        <button type="submit" class="secondary-button tiny-button">Logout</button>
+      </form>
+    </div>
+  </header>
+
+  <main class="boards-wrap compact-wrap">
+    <% boards.forEach(board => { %>
+      <section class="board-section compact-section" data-board-id="<%= board.id %>">
+        <div class="board-header board-header-flex">
+          <div class="board-title-wrap">
+            <h2 class="board-title"><%= board.name %></h2>
+            <button
+              type="button"
+              class="tiny-button secondary-button rename-board"
+              data-board-id="<%= board.id %>"
+              data-board-name="<%= board.name %>"
+            >
+              Rename
+            </button>
+            <button
+              type="button"
+              class="tiny-button danger delete-board"
+              data-board-id="<%= board.id %>"
+            >
+              Delete
+            </button>
+          </div>
+
+          <form class="add-column-form inline-form" data-board-id="<%= board.id %>">
+            <input type="text" name="name" placeholder="New column" required />
+            <button type="submit" class="tiny-button">Add column</button>
+          </form>
+        </div>
+
+        <div class="columns-grid compact-grid dynamic-grid" style="grid-template-columns: repeat(<%= Math.max(board.columns.length, 1) %>, minmax(220px, 1fr));">
+          <% board.columns.forEach(column => { %>
+            <div class="column compact-column" data-column-id="<%= column.id %>">
+              <div class="column-header">
+                <div class="column-title-wrap">
+                  <h3><%= column.name %></h3>
+                  <button
+                    type="button"
+                    class="tiny-button secondary-button rename-column"
+                    data-column-id="<%= column.id %>"
+                    data-column-name="<%= column.name %>"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    class="tiny-button danger delete-column"
+                    data-column-id="<%= column.id %>"
+                  >
+                    X
+                  </button>
+                </div>
+                <span class="count"><%= column.cards.length %></span>
+              </div>
+
+              <form class="add-card-form compact-form" data-column-id="<%= column.id %>">
+                <input type="text" name="title" placeholder="Add a card..." required />
+                <textarea name="description" placeholder="Optional notes"></textarea>
+                <button type="submit" class="tiny-button">Add</button>
+              </form>
+
+              <div class="card-list" data-column-id="<%= column.id %>">
+                <% column.cards.forEach(card => { %>
+                  <article
+                    class="card compact-card-item"
+                    draggable="true"
+                    data-card-id="<%= card.id %>"
+                    data-column-id="<%= column.id %>"
+                  >
+                    <div class="card-top">
+                      <strong class="card-title"><%= card.title %></strong>
+                    </div>
+
+                    <% if (card.description) { %>
+                      <p class="card-desc"><%= card.description %></p>
+                    <% } %>
+
+                    <div class="card-actions">
+                      <button type="button" class="small-button tiny-button edit-card">Edit</button>
+                      <button type="button" class="small-button tiny-button danger delete-card">Delete</button>
+                    </div>
+                  </article>
+                <% }) %>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      </section>
+    <% }) %>
+  </main>
+
+  <div id="editModal" class="modal hidden">
+    <div class="modal-card compact-card">
+      <h3>Edit card</h3>
+      <form id="editCardForm" class="stack">
+        <input type="hidden" id="editCardId" />
+        <label>
+          <span>Title</span>
+          <input type="text" id="editTitle" required />
+        </label>
+        <label>
+          <span>Description</span>
+          <textarea id="editDescription"></textarea>
+        </label>
+        <div class="modal-actions">
+          <button type="submit" class="tiny-button">Save</button>
+          <button type="button" id="closeModal" class="secondary-button tiny-button">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
