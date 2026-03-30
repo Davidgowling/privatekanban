@@ -356,8 +356,12 @@ function wireCard(cardEl) {
     } catch (err) { showToast(err.message); }
   });
 
+  // Mouse drag
   cardEl.addEventListener("dragstart", () => cardEl.classList.add("dragging"));
   cardEl.addEventListener("dragend", () => cardEl.classList.remove("dragging"));
+
+  // Touch drag
+  wireTouchDrag(cardEl);
 }
 
 function wireAddCardForm(form) {
@@ -460,7 +464,7 @@ function wireEditModal() {
 }
 
 // --------------------
-// DRAG AND DROP
+// MOUSE DRAG AND DROP
 // --------------------
 
 function wireDragTarget(listEl) {
@@ -473,17 +477,11 @@ function wireDragTarget(listEl) {
     else listEl.insertBefore(dragging, after);
   });
 
-  listEl.addEventListener("drop", async () => {
+  listEl.addEventListener("drop", async (e) => {
+    e.preventDefault();
     const dragging = document.querySelector(".dragging");
     if (!dragging) return;
-    const targetColumnId = listEl.dataset.columnId;
-    const cards = [...listEl.querySelectorAll(".card")];
-    const newPosition = cards.findIndex(c => c.dataset.cardId === dragging.dataset.cardId);
-    try {
-      await postJSON(`/cards/${dragging.dataset.cardId}/move`, { targetColumnId, newPosition });
-      dragging.dataset.columnId = targetColumnId;
-      document.querySelectorAll(".column").forEach(updateColumnCount);
-    } catch (err) { showToast(err.message); }
+    await commitCardMove(dragging, listEl);
   });
 }
 
@@ -495,6 +493,86 @@ function getDragAfterElement(container, y) {
     if (offset < 0 && offset > closest.offset) return { offset, element: child };
     return closest;
   }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+async function commitCardMove(cardEl, listEl) {
+  const targetColumnId = listEl.dataset.columnId;
+  const cards = [...listEl.querySelectorAll(".card")];
+  const newPosition = cards.findIndex(c => c.dataset.cardId === cardEl.dataset.cardId);
+  try {
+    await postJSON(`/cards/${cardEl.dataset.cardId}/move`, { targetColumnId, newPosition });
+    cardEl.dataset.columnId = targetColumnId;
+    document.querySelectorAll(".column").forEach(updateColumnCount);
+  } catch (err) { showToast(err.message); }
+}
+
+// --------------------
+// TOUCH DRAG AND DROP
+// --------------------
+
+function wireTouchDrag(cardEl) {
+  let touchClone = null;
+  let lastList = null;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  cardEl.addEventListener("touchstart", (e) => {
+    const touch = e.touches[0];
+    const rect = cardEl.getBoundingClientRect();
+    offsetX = touch.clientX - rect.left;
+    offsetY = touch.clientY - rect.top;
+
+    // Create a visual clone to drag around
+    touchClone = cardEl.cloneNode(true);
+    touchClone.style.cssText = `
+      position: fixed;
+      width: ${rect.width}px;
+      left: ${rect.left}px;
+      top: ${rect.top}px;
+      opacity: 0.85;
+      pointer-events: none;
+      z-index: 9999;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+      border-radius: 5px;
+      background: #fff;
+      transform: rotate(1deg);
+    `;
+    document.body.appendChild(touchClone);
+    cardEl.classList.add("dragging");
+  }, { passive: true });
+
+  cardEl.addEventListener("touchmove", (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+
+    // Move the clone
+    touchClone.style.left = `${touch.clientX - offsetX}px`;
+    touchClone.style.top = `${touch.clientY - offsetY}px`;
+
+    // Find which card-list we're over
+    touchClone.style.display = "none";
+    const elBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+    touchClone.style.display = "";
+
+    const list = elBelow?.closest(".card-list");
+    if (!list) return;
+
+    lastList = list;
+
+    // Reorder cards visually
+    const after = getDragAfterElement(list, touch.clientY);
+    if (after == null) list.appendChild(cardEl);
+    else list.insertBefore(cardEl, after);
+  }, { passive: false });
+
+  cardEl.addEventListener("touchend", async () => {
+    cardEl.classList.remove("dragging");
+    if (touchClone) { touchClone.remove(); touchClone = null; }
+    if (lastList) {
+      await commitCardMove(cardEl, lastList);
+      lastList = null;
+    }
+  });
 }
 
 // --------------------
