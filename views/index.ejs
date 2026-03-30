@@ -9,13 +9,7 @@
 <body>
   <header class="topbar">
     <div class="topbar-left">
-      <div class="app-logo">
-        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-          <rect x="1" y="1" width="4" height="10" rx="1"/>
-          <rect x="6" y="1" width="4" height="7" rx="1"/>
-          <rect x="11" y="1" width="4" height="13" rx="1"/>
-        </svg>
-      </div>
+      <div class="app-logo">&#9776;</div>
       <div>
         <h1>Kanban</h1>
         <p class="muted small-text">Signed in as <strong><%= currentUser %></strong></p>
@@ -41,17 +35,9 @@
           <div class="board-title-wrap">
             <h2 class="board-title"><%= board.name %></h2>
             <button type="button" class="icon-btn rename-board" title="Rename board"
-              data-board-id="<%= board.id %>" data-board-name="<%= board.name %>">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13H3v-2L11.5 2.5z"/>
-              </svg>
-            </button>
+              data-board-id="<%= board.id %>" data-board-name="<%= board.name %>">&#9998;</button>
             <button type="button" class="icon-btn icon-btn-danger delete-board" title="Delete board"
-              data-board-id="<%= board.id %>">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 4l8 8M12 4l-8 8"/>
-              </svg>
-            </button>
+              data-board-id="<%= board.id %>">&#10005;</button>
           </div>
 
           <form class="add-column-form inline-form" data-board-id="<%= board.id %>">
@@ -68,29 +54,17 @@
                 <div class="column-title-wrap">
                   <h3><%= column.name %></h3>
                   <button type="button" class="icon-btn rename-column" title="Rename column"
-                    data-column-id="<%= column.id %>" data-column-name="<%= column.name %>">
-                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13H3v-2L11.5 2.5z"/>
-                    </svg>
-                  </button>
+                    data-column-id="<%= column.id %>" data-column-name="<%= column.name %>">&#9998;</button>
                   <button type="button" class="icon-btn icon-btn-danger delete-column" title="Delete column"
-                    data-column-id="<%= column.id %>">
-                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M4 4l8 8M12 4l-8 8"/>
-                    </svg>
-                  </button>
+                    data-column-id="<%= column.id %>">&#10005;</button>
                 </div>
                 <div class="column-header-right">
-                  <button type="button" class="icon-btn add-card-toggle" title="Add card">
-                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-                      <path d="M8 3v10M3 8h10"/>
-                    </svg>
-                  </button>
+                  <button type="button" class="icon-btn add-card-toggle" title="Add card">&#43;</button>
                   <span class="count"><%= column.cards.length %></span>
                 </div>
               </div>
 
-              <form class="add-card-form hidden" data-column-id="<%= column.id %>">
+              <form class="add-card-form" data-column-id="<%= column.id %>" style="display:none;">
                 <input type="text" name="title" placeholder="Card title…" required />
                 <textarea name="description" placeholder="Notes (optional)"></textarea>
                 <div class="card-form-row">
@@ -138,16 +112,8 @@
                     <div class="card-top">
                       <strong class="card-title"><%= card.title %></strong>
                       <div class="card-icons">
-                        <button type="button" class="icon-btn edit-card" title="Edit card">
-                          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13H3v-2L11.5 2.5z"/>
-                          </svg>
-                        </button>
-                        <button type="button" class="icon-btn icon-btn-danger delete-card" title="Delete card">
-                          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 4l8 8M12 4l-8 8"/>
-                          </svg>
-                        </button>
+                        <button type="button" class="icon-btn edit-card" title="Edit card">&#9998;</button>
+                        <button type="button" class="icon-btn icon-btn-danger delete-card" title="Delete card">&#10005;</button>
                       </div>
                     </div>
 
