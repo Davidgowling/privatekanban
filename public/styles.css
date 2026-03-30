@@ -4,8 +4,8 @@
 
 body {
   margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
-  background: #f5f7fb;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: #f0f2f7;
   color: #1f2937;
   font-size: 14px;
 }
@@ -15,17 +15,21 @@ h1, h2, h3, p {
 }
 
 h1 {
-  font-size: 24px;
-  margin-bottom: 4px;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 2px;
+  letter-spacing: -0.3px;
 }
 
 h2 {
-  font-size: 18px;
-  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 0;
 }
 
 h3 {
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
   margin-bottom: 0;
 }
 
@@ -37,58 +41,96 @@ h3 {
   color: #6b7280;
 }
 
+/* --------------------
+   LOGIN PAGE
+-------------------- */
+
 .login-page {
   min-height: 100vh;
   display: grid;
   place-items: center;
   padding: 20px;
+  background: linear-gradient(135deg, #eef2ff 0%, #f0f9ff 100%);
 }
 
 .auth-shell {
   width: 100%;
-  max-width: 960px;
+  max-width: 880px;
+}
+
+.auth-shell h1 {
+  font-size: 26px;
+  margin-bottom: 2px;
 }
 
 .auth-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  gap: 16px;
   margin-top: 16px;
 }
 
-.login-card,
+.login-card {
+  width: 100%;
+  background: white;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.07), 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
 .modal-card {
   width: 100%;
   background: white;
-  border-radius: 12px;
-  padding: 18px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
 }
 
-.compact-card {
-  padding: 16px;
-}
+/* --------------------
+   TOPBAR
+-------------------- */
 
 .topbar {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   background: white;
   border-bottom: 1px solid #e5e7eb;
+  padding: 12px 20px;
   position: sticky;
   top: 0;
   z-index: 10;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
-.compact-topbar {
-  padding: 14px 18px;
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-logo {
+  width: 30px;
+  height: 30px;
+  background: #4f46e5;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.app-logo svg {
+  width: 16px;
+  height: 16px;
+  fill: white;
 }
 
 .topbar-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -99,26 +141,24 @@ h3 {
   flex-wrap: wrap;
 }
 
+/* --------------------
+   BOARDS LAYOUT
+-------------------- */
+
 .boards-wrap {
   display: grid;
-  gap: 18px;
-}
-
-.compact-wrap {
-  padding: 18px;
+  gap: 20px;
+  padding: 20px;
 }
 
 .board-section {
-  background: #eef2f8;
-  border-radius: 14px;
-}
-
-.compact-section {
-  padding: 12px;
+  background: #e8ecf4;
+  border-radius: 16px;
+  padding: 14px;
 }
 
 .board-header {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .board-header-flex {
@@ -142,21 +182,19 @@ h3 {
   gap: 10px;
   align-items: start;
   overflow-x: auto;
+  padding-bottom: 4px;
 }
 
-.compact-grid {
-  gap: 10px;
-}
+/* --------------------
+   COLUMNS
+-------------------- */
 
 .column {
   background: white;
-  border-radius: 10px;
-  min-height: 220px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
-}
-
-.compact-column {
-  padding: 10px;
+  border-radius: 12px;
+  min-height: 200px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  padding: 12px;
 }
 
 .column-header {
@@ -164,32 +202,67 @@ h3 {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .count {
-  background: #e5eefc;
-  color: #244a96;
+  background: #ede9fe;
+  color: #5b21b6;
   padding: 2px 8px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
+  min-width: 22px;
+  text-align: center;
 }
 
-.add-card-form,
-.stack {
+/* --------------------
+   CARD FORM
+-------------------- */
+
+.add-card-form {
   display: grid;
-  gap: 8px;
-}
-
-.compact-form {
+  gap: 6px;
   margin-bottom: 10px;
 }
 
+.card-form-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.card-form-row input[type="date"] {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 6px 8px;
+}
+
+.card-form-row select {
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  background: white;
+  cursor: pointer;
+}
+
+.stack {
+  display: grid;
+  gap: 10px;
+}
+
+/* --------------------
+   INPUTS & BUTTONS
+-------------------- */
+
 input,
 textarea,
-button {
+button,
+select {
   font: inherit;
 }
 
@@ -198,130 +271,297 @@ textarea {
   width: 100%;
   border: 1px solid #d1d5db;
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 7px 10px;
   background: white;
   font-size: 13px;
+  transition: border-color 0.15s;
+}
+
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
 textarea {
   resize: vertical;
-  min-height: 56px;
+  min-height: 54px;
+}
+
+label span {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 4px;
 }
 
 button {
   border: none;
   border-radius: 7px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   cursor: pointer;
-  background: #2563eb;
+  background: #4f46e5;
   color: white;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 12px;
-  line-height: 1.2;
+  line-height: 1.3;
+  transition: opacity 0.15s, background 0.15s;
+  white-space: nowrap;
 }
 
-button:hover {
-  opacity: 0.95;
+button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .tiny-button {
-  padding: 5px 8px;
+  padding: 5px 9px;
   font-size: 11px;
 }
 
 .secondary-button {
-  background: #e5e7eb;
-  color: #111827;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
 }
 
-.small-button {
-  padding: 5px 8px;
-  font-size: 11px;
-  border-radius: 6px;
+.secondary-button:hover:not(:disabled) {
+  background: #e5e7eb;
+  opacity: 1;
 }
 
 .danger {
-  background: #dc2626;
+  background: #ef4444;
   color: white;
 }
 
+.danger:hover:not(:disabled) {
+  background: #dc2626;
+  opacity: 1;
+}
+
+/* --------------------
+   CARDS
+-------------------- */
+
 .card-list {
   display: grid;
-  gap: 8px;
-  min-height: 50px;
+  gap: 6px;
+  min-height: 40px;
 }
 
 .card {
-  background: #f8fafc;
-  border: 1px solid #e5e7eb;
-  border-radius: 9px;
+  background: #fafafa;
+  border: 1px solid #e9ecef;
+  border-radius: 10px;
   cursor: grab;
+  padding: 10px;
+  transition: box-shadow 0.15s, transform 0.1s;
+  border-left: 3px solid transparent;
 }
 
-.compact-card-item {
-  padding: 8px;
+.card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .card.dragging {
-  opacity: 0.6;
+  opacity: 0.5;
+  transform: rotate(1deg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  cursor: grabbing;
 }
 
 .card-title {
   font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  display: block;
 }
 
 .card-desc {
-  color: #4b5563;
+  color: #6b7280;
   font-size: 12px;
   white-space: pre-wrap;
-  margin: 6px 0 0 0;
+  margin: 5px 0 0 0;
+  line-height: 1.5;
 }
 
 .card-actions {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   margin-top: 8px;
   flex-wrap: wrap;
 }
+
+/* --------------------
+   DUE DATE BADGES
+-------------------- */
+
+.due-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.due-soon {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.due-overdue {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* --------------------
+   ERROR / SUCCESS BOXES
+-------------------- */
 
 .error-box {
   background: #fef2f2;
   color: #991b1b;
   border: 1px solid #fecaca;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-radius: 8px;
   margin-bottom: 12px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .success-box {
-  background: #ecfdf5;
-  color: #065f46;
-  border: 1px solid #a7f3d0;
-  padding: 8px 10px;
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  padding: 10px 12px;
   border-radius: 8px;
   margin-bottom: 12px;
-  font-size: 12px;
+  font-size: 13px;
 }
+
+/* --------------------
+   TOAST NOTIFICATIONS
+-------------------- */
+
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  background: #1f2937;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  max-width: 320px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast-success {
+  background: #166534;
+}
+
+.toast-error {
+  background: #991b1b;
+}
+
+/* --------------------
+   MODAL
+-------------------- */
 
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(17, 24, 39, 0.5);
+  background: rgba(15, 23, 42, 0.55);
   display: grid;
   place-items: center;
-  padding: 18px;
+  padding: 20px;
+  backdrop-filter: blur(2px);
+  z-index: 100;
 }
 
 .modal.hidden {
   display: none;
 }
 
+.modal-card {
+  max-width: 440px;
+  width: 100%;
+}
+
+.modal-card h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #111827;
+}
+
 .modal-actions {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+  margin-top: 4px;
 }
+
+.modal-row {
+  display: flex;
+  gap: 10px;
+}
+
+.modal-row > * {
+  flex: 1;
+}
+
+/* --------------------
+   DANGER ZONE (account deletion)
+-------------------- */
+
+.danger-zone {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid #fecaca;
+}
+
+.danger-zone h3 {
+  color: #991b1b;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.danger-zone p {
+  color: #6b7280;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+/* --------------------
+   RESPONSIVE
+-------------------- */
 
 @media (max-width: 1100px) {
   .auth-grid {
@@ -333,6 +573,11 @@ button:hover {
   .topbar {
     flex-direction: column;
     align-items: flex-start;
+    padding: 12px 14px;
+  }
+
+  .boards-wrap {
+    padding: 14px;
   }
 
   .board-header-flex {
@@ -346,5 +591,14 @@ button:hover {
 
   .inline-form input {
     flex: 1;
+  }
+
+  .card-form-row {
+    flex-direction: column;
+  }
+
+  .card-form-row input[type="date"],
+  .card-form-row select {
+    width: 100%;
   }
 }
