@@ -8,27 +8,12 @@ async function postJSON(url, payload = {}) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
-
   if (!response.ok) {
     let message = "Request failed.";
-    try {
-      const data = await response.json();
-      message = data.error || message;
-    } catch (_) {}
+    try { const d = await response.json(); message = d.error || message; } catch (_) {}
     throw new Error(message);
   }
-
   return response.json();
-}
-
-function withLoading(button, asyncFn) {
-  return async (...args) => {
-    button.disabled = true;
-    const orig = button.textContent;
-    button.textContent = "…";
-    try { await asyncFn(...args); }
-    finally { button.disabled = false; button.textContent = orig; }
-  };
 }
 
 // --------------------
@@ -54,7 +39,7 @@ function showToast(message, type = "error") {
 }
 
 // --------------------
-// DOM BUILDERS
+// HELPERS
 // --------------------
 
 function escHtml(str) {
@@ -66,8 +51,7 @@ function escHtml(str) {
 function formatDueDate(dateStr) {
   if (!dateStr) return null;
   const date = new Date(dateStr + "T00:00:00");
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
   const diff = Math.round((date - today) / (1000 * 60 * 60 * 24));
   const label = date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
   let cls = "due-badge";
@@ -77,10 +61,20 @@ function formatDueDate(dateStr) {
 }
 
 function updateColumnCount(columnEl) {
-  const list = columnEl.querySelector(".card-list");
   const count = columnEl.querySelector(".count");
-  if (list && count) count.textContent = list.querySelectorAll(".card").length;
+  const list = columnEl.querySelector(".card-list");
+  if (count && list) count.textContent = list.querySelectorAll(".card").length;
 }
+
+function rgbToHex(rgb) {
+  const match = rgb.match(/\d+/g);
+  if (!match || match.length < 3) return "";
+  return "#" + match.slice(0, 3).map(n => Number(n).toString(16).padStart(2, "0")).join("");
+}
+
+// --------------------
+// DOM BUILDERS
+// --------------------
 
 function buildCardEl(card) {
   const article = document.createElement("article");
@@ -88,37 +82,31 @@ function buildCardEl(card) {
   article.draggable = true;
   article.dataset.cardId = card.id;
   article.dataset.columnId = card.column_id;
-
-  if (card.color) {
-    article.style.borderLeftColor = card.color;
-    article.style.borderLeftWidth = "3px";
-  }
+  if (card.color) article.style.borderLeftColor = card.color;
 
   const top = document.createElement("div");
   top.className = "card-top";
 
-  const titleEl = document.createElement("strong");
-  titleEl.className = "card-title";
-  titleEl.textContent = card.title;
+  const title = document.createElement("strong");
+  title.className = "card-title";
+  title.textContent = card.title;
 
   const icons = document.createElement("div");
   icons.className = "card-icons";
 
-  const editBtn = document.createElement("button");
-  editBtn.type = "button";
-  editBtn.className = "icon-btn edit-card";
-  editBtn.title = "Edit card";
-  editBtn.textContent = "✎";
+  const editIc = document.createElement("i");
+  editIc.className = "ic edit-card";
+  editIc.title = "Edit";
+  editIc.innerHTML = "&#9998;";
 
-  const deleteBtn = document.createElement("button");
-  deleteBtn.type = "button";
-  deleteBtn.className = "icon-btn icon-btn-danger delete-card";
-  deleteBtn.title = "Delete card";
-  deleteBtn.textContent = "✕";
+  const delIc = document.createElement("i");
+  delIc.className = "ic del delete-card";
+  delIc.title = "Delete";
+  delIc.innerHTML = "&#10005;";
 
-  icons.appendChild(editBtn);
-  icons.appendChild(deleteBtn);
-  top.appendChild(titleEl);
+  icons.appendChild(editIc);
+  icons.appendChild(delIc);
+  top.appendChild(title);
   top.appendChild(icons);
   article.appendChild(top);
 
@@ -135,6 +123,7 @@ function buildCardEl(card) {
       const badge = document.createElement("span");
       badge.className = info.cls;
       badge.textContent = info.label;
+      article.dataset.dueDate = card.due_date;
       article.appendChild(badge);
     }
   }
@@ -149,16 +138,12 @@ function buildColumnEl(column) {
   div.dataset.columnId = column.id;
 
   div.innerHTML = `
-    <div class="column-header">
-      <div class="column-title-wrap">
-        <h3>${escHtml(column.name)}</h3>
-        <button type="button" class="icon-btn rename-column" title="Rename column"
-          data-column-id="${column.id}" data-column-name="${escHtml(column.name)}">&#9998;</button>
-        <button type="button" class="icon-btn icon-btn-danger delete-column" title="Delete column"
-          data-column-id="${column.id}">&#10005;</button>
-      </div>
-      <div class="column-header-right">
-        <button type="button" class="icon-btn add-card-toggle" title="Add card">&#43;</button>
+    <div class="col-header">
+      <span class="col-name">${escHtml(column.name)}</span>
+      <div class="col-controls">
+        <i class="ic rename-column" title="Rename" data-column-id="${column.id}" data-column-name="${escHtml(column.name)}">&#9998;</i>
+        <i class="ic del delete-column" title="Delete" data-column-id="${column.id}">&#10005;</i>
+        <i class="ic plus add-card-toggle" title="Add card">&#43;</i>
         <span class="count">0</span>
       </div>
     </div>
@@ -166,8 +151,8 @@ function buildColumnEl(column) {
       <input type="text" name="title" placeholder="Card title…" required />
       <textarea name="description" placeholder="Notes (optional)"></textarea>
       <div class="card-form-row">
-        <input type="date" name="due_date" title="Due date" />
-        <select name="color" title="Label colour">
+        <input type="date" name="due_date" />
+        <select name="color">
           <option value="">No label</option>
           <option value="#ef4444">Red</option>
           <option value="#f97316">Orange</option>
@@ -177,15 +162,15 @@ function buildColumnEl(column) {
           <option value="#a855f7">Purple</option>
         </select>
       </div>
-      <div class="card-form-actions">
-        <button type="submit" class="tiny-button">Add card</button>
-        <button type="button" class="tiny-button secondary-button cancel-add-card">Cancel</button>
+      <div class="form-btns">
+        <button type="submit" class="flat-btn">Add card</button>
+        <button type="button" class="flat-btn muted cancel-add-card">Cancel</button>
       </div>
     </form>
     <div class="card-list" data-column-id="${column.id}"></div>
   `;
 
-  wireColumnButtons(div);
+  wireColumnControls(div);
   wireAddCardToggle(div);
   wireAddCardForm(div.querySelector(".add-card-form"));
   wireDragTarget(div.querySelector(".card-list"));
@@ -199,26 +184,22 @@ function buildBoardEl(board) {
   const colCount = Math.max(board.columns.length, 1);
 
   section.innerHTML = `
-    <div class="board-header board-header-flex">
-      <div class="board-title-wrap">
+    <div class="board-header">
+      <div class="board-title-row">
         <h2 class="board-title">${escHtml(board.name)}</h2>
-        <button type="button" class="icon-btn rename-board" title="Rename board"
-          data-board-id="${board.id}" data-board-name="${escHtml(board.name)}">&#9998;</button>
-        <button type="button" class="icon-btn icon-btn-danger delete-board" title="Delete board"
-          data-board-id="${board.id}">&#10005;</button>
+        <i class="ic rename-board" title="Rename board" data-board-id="${board.id}" data-board-name="${escHtml(board.name)}">&#9998;</i>
+        <i class="ic del delete-board" title="Delete board" data-board-id="${board.id}">&#10005;</i>
       </div>
-      <form class="add-column-form inline-form" data-board-id="${board.id}">
-        <input type="text" name="name" placeholder="New column" required />
-        <button type="submit" class="tiny-button">Add column</button>
+      <form class="board-col-form" data-board-id="${board.id}">
+        <input type="text" name="name" class="flat-input" placeholder="New column" required />
+        <button type="submit" class="flat-btn">Add column</button>
       </form>
     </div>
-    <div class="columns-grid dynamic-grid"
-      style="grid-template-columns: repeat(${colCount}, minmax(240px, 1fr));">
-    </div>
+    <div class="columns-grid" style="grid-template-columns: repeat(${colCount}, minmax(200px, 1fr));"></div>
   `;
 
-  wireBoardButtons(section);
-  wireAddColumnForm(section.querySelector(".add-column-form"));
+  wireBoardControls(section);
+  wireAddColumnForm(section.querySelector(".board-col-form"));
 
   const grid = section.querySelector(".columns-grid");
   for (const col of board.columns) grid.appendChild(buildColumnEl(col));
@@ -230,48 +211,48 @@ function buildBoardEl(board) {
 // --------------------
 
 function wireAddCardToggle(columnEl) {
-  const toggleBtn = columnEl.querySelector(".add-card-toggle");
+  const toggle = columnEl.querySelector(".add-card-toggle");
   const form = columnEl.querySelector(".add-card-form");
-  const cancelBtn = columnEl.querySelector(".cancel-add-card");
-  if (!toggleBtn || !form) return;
+  const cancel = columnEl.querySelector(".cancel-add-card");
+  if (!toggle || !form) return;
 
-  toggleBtn.addEventListener("click", () => {
-    const isHidden = form.style.display === "none" || form.style.display === "";
+  toggle.addEventListener("click", () => {
+    const isHidden = form.style.display === "none" || !form.style.display;
     form.style.display = isHidden ? "grid" : "none";
     if (isHidden) form.querySelector("input[name='title']").focus();
   });
 
-  cancelBtn?.addEventListener("click", () => {
+  cancel?.addEventListener("click", () => {
     form.style.display = "none";
     form.reset();
   });
 }
 
 // --------------------
-// BOARD WIRING
+// BOARD CONTROLS
 // --------------------
 
-function wireBoardButtons(boardEl) {
-  const renameBtn = boardEl.querySelector(".rename-board");
-  const deleteBtn = boardEl.querySelector(".delete-board");
+function wireBoardControls(boardEl) {
+  const renameIc = boardEl.querySelector(".rename-board");
+  const deleteIc = boardEl.querySelector(".delete-board");
 
-  renameBtn?.addEventListener("click", async () => {
-    const boardId = renameBtn.dataset.boardId;
-    const newName = prompt("Rename board:", renameBtn.dataset.boardName);
+  renameIc?.addEventListener("click", async () => {
+    const boardId = renameIc.dataset.boardId;
+    const newName = prompt("Rename board:", renameIc.dataset.boardName);
     if (newName === null) return;
     if (!newName.trim()) { showToast("Board name cannot be empty."); return; }
     try {
       await postJSON(`/boards/${boardId}/update`, { name: newName.trim() });
       boardEl.querySelector(".board-title").textContent = newName.trim();
-      renameBtn.dataset.boardName = newName.trim();
+      renameIc.dataset.boardName = newName.trim();
       showToast("Board renamed.", "success");
     } catch (err) { showToast(err.message); }
   });
 
-  deleteBtn?.addEventListener("click", async () => {
+  deleteIc?.addEventListener("click", async () => {
     if (!confirm("Delete this board and everything in it?")) return;
     try {
-      await postJSON(`/boards/${deleteBtn.dataset.boardId}/delete`);
+      await postJSON(`/boards/${deleteIc.dataset.boardId}/delete`);
       boardEl.remove();
       showToast("Board deleted.", "success");
     } catch (err) { showToast(err.message); }
@@ -299,36 +280,36 @@ function wireAddBoardForm() {
 }
 
 // --------------------
-// COLUMN WIRING
+// COLUMN CONTROLS
 // --------------------
 
-function wireColumnButtons(columnEl) {
-  const renameBtn = columnEl.querySelector(".rename-column");
-  const deleteBtn = columnEl.querySelector(".delete-column");
+function wireColumnControls(columnEl) {
+  const renameIc = columnEl.querySelector(".rename-column");
+  const deleteIc = columnEl.querySelector(".delete-column");
 
-  renameBtn?.addEventListener("click", async () => {
-    const columnId = renameBtn.dataset.columnId;
-    const newName = prompt("Rename column:", renameBtn.dataset.columnName);
+  renameIc?.addEventListener("click", async () => {
+    const columnId = renameIc.dataset.columnId;
+    const newName = prompt("Rename column:", renameIc.dataset.columnName);
     if (newName === null) return;
     if (!newName.trim()) { showToast("Column name cannot be empty."); return; }
     try {
       await postJSON(`/columns/${columnId}/update`, { name: newName.trim() });
-      columnEl.querySelector("h3").textContent = newName.trim();
-      renameBtn.dataset.columnName = newName.trim();
+      columnEl.querySelector(".col-name").textContent = newName.trim();
+      renameIc.dataset.columnName = newName.trim();
       showToast("Column renamed.", "success");
     } catch (err) { showToast(err.message); }
   });
 
-  deleteBtn?.addEventListener("click", async () => {
+  deleteIc?.addEventListener("click", async () => {
     if (!confirm("Delete this column and all cards inside it?")) return;
     try {
-      await postJSON(`/columns/${deleteBtn.dataset.columnId}/delete`);
+      await postJSON(`/columns/${deleteIc.dataset.columnId}/delete`);
       const boardEl = columnEl.closest(".board-section");
       columnEl.remove();
       if (boardEl) {
         const grid = boardEl.querySelector(".columns-grid");
         const remaining = grid.querySelectorAll(".column").length;
-        grid.style.gridTemplateColumns = `repeat(${Math.max(remaining, 1)}, minmax(240px, 1fr))`;
+        grid.style.gridTemplateColumns = `repeat(${Math.max(remaining, 1)}, minmax(200px, 1fr))`;
       }
       showToast("Column deleted.", "success");
     } catch (err) { showToast(err.message); }
@@ -350,7 +331,7 @@ function wireAddColumnForm(form) {
       input.value = "";
       const grid = form.closest(".board-section").querySelector(".columns-grid");
       grid.appendChild(buildColumnEl(data.column));
-      grid.style.gridTemplateColumns = `repeat(${grid.querySelectorAll(".column").length}, minmax(240px, 1fr))`;
+      grid.style.gridTemplateColumns = `repeat(${grid.querySelectorAll(".column").length}, minmax(200px, 1fr))`;
       showToast("Column added.", "success");
     } catch (err) { showToast(err.message); }
     finally { btn.disabled = false; }
@@ -358,7 +339,7 @@ function wireAddColumnForm(form) {
 }
 
 // --------------------
-// CARD WIRING
+// CARD CONTROLS
 // --------------------
 
 function wireCard(cardEl) {
@@ -409,12 +390,6 @@ function wireAddCardForm(form) {
 // EDIT MODAL
 // --------------------
 
-function rgbToHex(rgb) {
-  const match = rgb.match(/\d+/g);
-  if (!match || match.length < 3) return "";
-  return "#" + match.slice(0, 3).map(n => Number(n).toString(16).padStart(2, "0")).join("");
-}
-
 function openEditModal(cardEl) {
   const modal = document.getElementById("editModal");
   if (!modal) return;
@@ -450,7 +425,6 @@ function wireEditModal() {
 
     const btn = editForm.querySelector("button[type=submit]");
     btn.disabled = true;
-    btn.textContent = "Saving…";
     try {
       await postJSON(`/cards/${cardId}/update`, { title, description, due_date, color });
 
@@ -475,14 +449,13 @@ function wireEditModal() {
           }
         } else if (badge) { badge.remove(); delete cardEl.dataset.dueDate; }
 
-        if (color) { cardEl.style.borderLeftColor = color; cardEl.style.borderLeftWidth = "3px"; }
-        else { cardEl.style.borderLeftColor = ""; cardEl.style.borderLeftWidth = ""; }
+        cardEl.style.borderLeftColor = color || "";
       }
 
       modal.classList.add("hidden");
       showToast("Card saved.", "success");
     } catch (err) { showToast(err.message); }
-    finally { btn.disabled = false; btn.textContent = "Save"; }
+    finally { btn.disabled = false; }
   });
 }
 
@@ -545,10 +518,10 @@ function wireDeleteAccount() {
 
 function initPage() {
   wireAddBoardForm();
-  document.querySelectorAll(".board-section").forEach(wireBoardButtons);
-  document.querySelectorAll(".add-column-form").forEach(wireAddColumnForm);
+  document.querySelectorAll(".board-section").forEach(wireBoardControls);
+  document.querySelectorAll(".board-col-form").forEach(wireAddColumnForm);
   document.querySelectorAll(".column").forEach(colEl => {
-    wireColumnButtons(colEl);
+    wireColumnControls(colEl);
     wireAddCardToggle(colEl);
     wireDragTarget(colEl.querySelector(".card-list"));
   });

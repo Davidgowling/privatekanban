@@ -9,20 +9,20 @@
 <body>
   <header class="topbar">
     <div class="topbar-left">
-      <div class="app-logo">&#9776;</div>
+      <div class="app-logo">&#8801;</div>
       <div>
         <h1>Kanban</h1>
-        <p class="muted small-text">Signed in as <strong><%= currentUser %></strong></p>
+        <p class="app-sub">Signed in as <strong><%= currentUser %></strong></p>
       </div>
     </div>
-
-    <div class="topbar-actions">
-      <form id="addBoardForm" class="inline-form">
-        <input type="text" id="newBoardName" placeholder="New board name" required />
-        <button type="submit" class="tiny-button">Add board</button>
+    <div class="topbar-right">
+      <form id="addBoardForm" class="topbar-form">
+        <input type="text" id="newBoardName" class="flat-input" placeholder="New board name" required />
+        <button type="submit" class="flat-btn">Add board</button>
       </form>
+      <div class="topbar-divider"></div>
       <form method="POST" action="/logout">
-        <button type="submit" class="secondary-button tiny-button">Logout</button>
+        <button type="submit" class="flat-btn muted">Logout</button>
       </form>
     </div>
   </header>
@@ -30,36 +30,31 @@
   <main class="boards-wrap">
     <% boards.forEach(board => { %>
       <section class="board-section" data-board-id="<%= board.id %>">
-
-        <div class="board-header board-header-flex">
-          <div class="board-title-wrap">
+        <div class="board-header">
+          <div class="board-title-row">
             <h2 class="board-title"><%= board.name %></h2>
-            <button type="button" class="icon-btn rename-board" title="Rename board"
-              data-board-id="<%= board.id %>" data-board-name="<%= board.name %>">&#9998;</button>
-            <button type="button" class="icon-btn icon-btn-danger delete-board" title="Delete board"
-              data-board-id="<%= board.id %>">&#10005;</button>
+            <i class="ic rename-board" title="Rename board"
+              data-board-id="<%= board.id %>" data-board-name="<%= board.name %>">&#9998;</i>
+            <i class="ic del delete-board" title="Delete board"
+              data-board-id="<%= board.id %>">&#10005;</i>
           </div>
-
-          <form class="add-column-form inline-form" data-board-id="<%= board.id %>">
-            <input type="text" name="name" placeholder="New column" required />
-            <button type="submit" class="tiny-button">Add column</button>
+          <form class="board-col-form" data-board-id="<%= board.id %>">
+            <input type="text" name="name" class="flat-input" placeholder="New column" required />
+            <button type="submit" class="flat-btn">Add column</button>
           </form>
         </div>
 
-        <div class="columns-grid dynamic-grid" style="grid-template-columns: repeat(<%= Math.max(board.columns.length, 1) %>, minmax(240px, 1fr));">
+        <div class="columns-grid" style="grid-template-columns: repeat(<%= Math.max(board.columns.length, 1) %>, minmax(200px, 1fr));">
           <% board.columns.forEach(column => { %>
             <div class="column" data-column-id="<%= column.id %>">
-
-              <div class="column-header">
-                <div class="column-title-wrap">
-                  <h3><%= column.name %></h3>
-                  <button type="button" class="icon-btn rename-column" title="Rename column"
-                    data-column-id="<%= column.id %>" data-column-name="<%= column.name %>">&#9998;</button>
-                  <button type="button" class="icon-btn icon-btn-danger delete-column" title="Delete column"
-                    data-column-id="<%= column.id %>">&#10005;</button>
-                </div>
-                <div class="column-header-right">
-                  <button type="button" class="icon-btn add-card-toggle" title="Add card">&#43;</button>
+              <div class="col-header">
+                <span class="col-name"><%= column.name %></span>
+                <div class="col-controls">
+                  <i class="ic rename-column" title="Rename column"
+                    data-column-id="<%= column.id %>" data-column-name="<%= column.name %>">&#9998;</i>
+                  <i class="ic del delete-column" title="Delete column"
+                    data-column-id="<%= column.id %>">&#10005;</i>
+                  <i class="ic plus add-card-toggle" title="Add card">&#43;</i>
                   <span class="count"><%= column.cards.length %></span>
                 </div>
               </div>
@@ -68,8 +63,8 @@
                 <input type="text" name="title" placeholder="Card title…" required />
                 <textarea name="description" placeholder="Notes (optional)"></textarea>
                 <div class="card-form-row">
-                  <input type="date" name="due_date" title="Due date" />
-                  <select name="color" title="Label colour">
+                  <input type="date" name="due_date" />
+                  <select name="color">
                     <option value="">No label</option>
                     <option value="#ef4444">Red</option>
                     <option value="#f97316">Orange</option>
@@ -79,9 +74,9 @@
                     <option value="#a855f7">Purple</option>
                   </select>
                 </div>
-                <div class="card-form-actions">
-                  <button type="submit" class="tiny-button">Add card</button>
-                  <button type="button" class="tiny-button secondary-button cancel-add-card">Cancel</button>
+                <div class="form-btns">
+                  <button type="submit" class="flat-btn">Add card</button>
+                  <button type="button" class="flat-btn muted cancel-add-card">Cancel</button>
                 </div>
               </form>
 
@@ -99,7 +94,7 @@
                       else if (diff <= 2) cls += ' due-soon';
                       dueBadgeHtml = `<span class="${cls}">${label}</span>`;
                     }
-                    const borderStyle = card.color ? `border-left: 3px solid ${card.color};` : '';
+                    const borderStyle = card.color ? `border-left-color:${card.color};` : '';
                   %>
                   <article
                     class="card"
@@ -112,15 +107,13 @@
                     <div class="card-top">
                       <strong class="card-title"><%= card.title %></strong>
                       <div class="card-icons">
-                        <button type="button" class="icon-btn edit-card" title="Edit card">&#9998;</button>
-                        <button type="button" class="icon-btn icon-btn-danger delete-card" title="Delete card">&#10005;</button>
+                        <i class="ic edit-card" title="Edit">&#9998;</i>
+                        <i class="ic del delete-card" title="Delete">&#10005;</i>
                       </div>
                     </div>
-
                     <% if (card.description) { %>
                       <p class="card-desc"><%= card.description %></p>
                     <% } %>
-
                     <%- dueBadgeHtml %>
                   </article>
                 <% }) %>
@@ -134,7 +127,7 @@
     <% if (boards.length === 0) { %>
       <div class="empty-state">
         <p>No boards yet.</p>
-        <p class="muted small-text">Type a board name above and click "Add board" to get started.</p>
+        <p class="app-sub">Type a board name above and click Add board to get started.</p>
       </div>
     <% } %>
   </main>
@@ -159,7 +152,7 @@
           </label>
           <label>
             <span>Label colour</span>
-            <select id="editColor" style="width:100%; padding:7px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:13px;">
+            <select id="editColor">
               <option value="">No label</option>
               <option value="#ef4444">Red</option>
               <option value="#f97316">Orange</option>
@@ -171,15 +164,13 @@
           </label>
         </div>
         <div class="modal-actions">
-          <button type="submit" class="tiny-button">Save</button>
-          <button type="button" id="closeModal" class="secondary-button tiny-button">Cancel</button>
+          <button type="submit" class="flat-btn">Save</button>
+          <button type="button" id="closeModal" class="flat-btn muted">Cancel</button>
         </div>
       </form>
-
       <div class="danger-zone">
-        <h3>Danger zone</h3>
-        <p>Permanently delete your account and all your data. This cannot be undone.</p>
-        <button type="button" id="deleteAccountBtn" class="tiny-button danger">Delete my account</button>
+        <p>Permanently delete your account and all data.</p>
+        <button type="button" id="deleteAccountBtn" class="flat-btn danger">Delete my account</button>
       </div>
     </div>
   </div>
