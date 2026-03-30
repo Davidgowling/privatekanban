@@ -27,7 +27,6 @@
         <input type="text" id="newBoardName" placeholder="New board name" required />
         <button type="submit" class="tiny-button">Add board</button>
       </form>
-
       <form method="POST" action="/logout">
         <button type="submit" class="secondary-button tiny-button">Logout</button>
       </form>
@@ -37,20 +36,22 @@
   <main class="boards-wrap">
     <% boards.forEach(board => { %>
       <section class="board-section" data-board-id="<%= board.id %>">
+
         <div class="board-header board-header-flex">
           <div class="board-title-wrap">
             <h2 class="board-title"><%= board.name %></h2>
-            <button
-              type="button"
-              class="tiny-button secondary-button rename-board"
-              data-board-id="<%= board.id %>"
-              data-board-name="<%= board.name %>"
-            >Rename</button>
-            <button
-              type="button"
-              class="tiny-button danger delete-board"
-              data-board-id="<%= board.id %>"
-            >Delete</button>
+            <button type="button" class="icon-btn rename-board" title="Rename board"
+              data-board-id="<%= board.id %>" data-board-name="<%= board.name %>">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13H3v-2L11.5 2.5z"/>
+              </svg>
+            </button>
+            <button type="button" class="icon-btn icon-btn-danger delete-board" title="Delete board"
+              data-board-id="<%= board.id %>">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4l8 8M12 4l-8 8"/>
+              </svg>
+            </button>
           </div>
 
           <form class="add-column-form inline-form" data-board-id="<%= board.id %>">
@@ -59,30 +60,39 @@
           </form>
         </div>
 
-        <div class="columns-grid dynamic-grid" style="grid-template-columns: repeat(<%= Math.max(board.columns.length, 1) %>, minmax(220px, 1fr));">
+        <div class="columns-grid dynamic-grid" style="grid-template-columns: repeat(<%= Math.max(board.columns.length, 1) %>, minmax(240px, 1fr));">
           <% board.columns.forEach(column => { %>
             <div class="column" data-column-id="<%= column.id %>">
+
               <div class="column-header">
                 <div class="column-title-wrap">
                   <h3><%= column.name %></h3>
-                  <button
-                    type="button"
-                    class="tiny-button secondary-button rename-column"
-                    data-column-id="<%= column.id %>"
-                    data-column-name="<%= column.name %>"
-                  >Edit</button>
-                  <button
-                    type="button"
-                    class="tiny-button danger delete-column"
-                    data-column-id="<%= column.id %>"
-                  >X</button>
+                  <button type="button" class="icon-btn rename-column" title="Rename column"
+                    data-column-id="<%= column.id %>" data-column-name="<%= column.name %>">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13H3v-2L11.5 2.5z"/>
+                    </svg>
+                  </button>
+                  <button type="button" class="icon-btn icon-btn-danger delete-column" title="Delete column"
+                    data-column-id="<%= column.id %>">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M4 4l8 8M12 4l-8 8"/>
+                    </svg>
+                  </button>
                 </div>
-                <span class="count"><%= column.cards.length %></span>
+                <div class="column-header-right">
+                  <button type="button" class="icon-btn add-card-toggle" title="Add card">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                      <path d="M8 3v10M3 8h10"/>
+                    </svg>
+                  </button>
+                  <span class="count"><%= column.cards.length %></span>
+                </div>
               </div>
 
-              <form class="add-card-form" data-column-id="<%= column.id %>">
-                <input type="text" name="title" placeholder="Add a card…" required />
-                <textarea name="description" placeholder="Optional notes"></textarea>
+              <form class="add-card-form hidden" data-column-id="<%= column.id %>">
+                <input type="text" name="title" placeholder="Card title…" required />
+                <textarea name="description" placeholder="Notes (optional)"></textarea>
                 <div class="card-form-row">
                   <input type="date" name="due_date" title="Due date" />
                   <select name="color" title="Label colour">
@@ -94,7 +104,10 @@
                     <option value="#3b82f6">Blue</option>
                     <option value="#a855f7">Purple</option>
                   </select>
-                  <button type="submit" class="tiny-button">Add</button>
+                </div>
+                <div class="card-form-actions">
+                  <button type="submit" class="tiny-button">Add card</button>
+                  <button type="button" class="tiny-button secondary-button cancel-add-card">Cancel</button>
                 </div>
               </form>
 
@@ -122,18 +135,27 @@
                     <% if (card.due_date) { %>data-due-date="<%= card.due_date %>"<% } %>
                     style="<%= borderStyle %>"
                   >
-                    <strong class="card-title"><%= card.title %></strong>
+                    <div class="card-top">
+                      <strong class="card-title"><%= card.title %></strong>
+                      <div class="card-icons">
+                        <button type="button" class="icon-btn edit-card" title="Edit card">
+                          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13H3v-2L11.5 2.5z"/>
+                          </svg>
+                        </button>
+                        <button type="button" class="icon-btn icon-btn-danger delete-card" title="Delete card">
+                          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 4l8 8M12 4l-8 8"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
 
                     <% if (card.description) { %>
                       <p class="card-desc"><%= card.description %></p>
                     <% } %>
 
                     <%- dueBadgeHtml %>
-
-                    <div class="card-actions">
-                      <button type="button" class="tiny-button secondary-button edit-card">Edit</button>
-                      <button type="button" class="tiny-button danger delete-card">Delete</button>
-                    </div>
                   </article>
                 <% }) %>
               </div>
@@ -144,14 +166,13 @@
     <% }) %>
 
     <% if (boards.length === 0) { %>
-      <div style="text-align:center; padding: 60px 20px; color: #9ca3af;">
-        <p style="font-size:16px; margin-bottom:8px;">No boards yet.</p>
-        <p style="font-size:13px;">Type a board name above and click "Add board" to get started.</p>
+      <div class="empty-state">
+        <p>No boards yet.</p>
+        <p class="muted small-text">Type a board name above and click "Add board" to get started.</p>
       </div>
     <% } %>
   </main>
 
-  <!-- Edit card modal -->
   <div id="editModal" class="modal hidden">
     <div class="modal-card">
       <h3>Edit card</h3>

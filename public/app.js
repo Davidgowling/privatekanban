@@ -21,7 +21,6 @@ async function postJSON(url, payload = {}) {
   return response.json();
 }
 
-// Disable a button and restore it after async work completes
 function withLoading(button, asyncFn) {
   return async (...args) => {
     button.disabled = true;
@@ -53,7 +52,6 @@ function showToast(message, type = "error") {
   toast.textContent = message;
   container.appendChild(toast);
 
-  // Trigger entrance animation
   requestAnimationFrame(() => toast.classList.add("toast-visible"));
 
   setTimeout(() => {
@@ -63,10 +61,24 @@ function showToast(message, type = "error") {
 }
 
 // --------------------
-// DOM BUILDERS
-// Helper functions that create HTML elements for new boards, columns, and cards
-// without requiring a page reload.
+// SVG ICONS
 // --------------------
+
+const ICON_PENCIL = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13H3v-2L11.5 2.5z"/></svg>`;
+const ICON_CROSS = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>`;
+const ICON_PLUS = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>`;
+
+// --------------------
+// DOM BUILDERS
+// --------------------
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
 function formatDueDate(dateStr) {
   if (!dateStr) return null;
@@ -81,9 +93,15 @@ function formatDueDate(dateStr) {
   return { label, cls };
 }
 
+function updateColumnCount(columnEl) {
+  const list = columnEl.querySelector(".card-list");
+  const count = columnEl.querySelector(".count");
+  if (list && count) count.textContent = list.querySelectorAll(".card").length;
+}
+
 function buildCardEl(card) {
   const article = document.createElement("article");
-  article.className = "card compact-card-item";
+  article.className = "card";
   article.draggable = true;
   article.dataset.cardId = card.id;
   article.dataset.columnId = card.column_id;
@@ -93,10 +111,34 @@ function buildCardEl(card) {
     article.style.borderLeftWidth = "3px";
   }
 
+  // Top row: title + icon buttons
+  const top = document.createElement("div");
+  top.className = "card-top";
+
   const titleEl = document.createElement("strong");
   titleEl.className = "card-title";
   titleEl.textContent = card.title;
-  article.appendChild(titleEl);
+
+  const icons = document.createElement("div");
+  icons.className = "card-icons";
+
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.className = "icon-btn edit-card";
+  editBtn.title = "Edit card";
+  editBtn.innerHTML = ICON_PENCIL;
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.type = "button";
+  deleteBtn.className = "icon-btn icon-btn-danger delete-card";
+  deleteBtn.title = "Delete card";
+  deleteBtn.innerHTML = ICON_CROSS;
+
+  icons.appendChild(editBtn);
+  icons.appendChild(deleteBtn);
+  top.appendChild(titleEl);
+  top.appendChild(icons);
+  article.appendChild(top);
 
   if (card.description) {
     const desc = document.createElement("p");
@@ -115,46 +157,32 @@ function buildCardEl(card) {
     }
   }
 
-  const actions = document.createElement("div");
-  actions.className = "card-actions";
-
-  const editBtn = document.createElement("button");
-  editBtn.type = "button";
-  editBtn.className = "small-button tiny-button edit-card";
-  editBtn.textContent = "Edit";
-
-  const deleteBtn = document.createElement("button");
-  deleteBtn.type = "button";
-  deleteBtn.className = "small-button tiny-button danger delete-card";
-  deleteBtn.textContent = "Delete";
-
-  actions.appendChild(editBtn);
-  actions.appendChild(deleteBtn);
-  article.appendChild(actions);
-
   wireCard(article);
   return article;
 }
 
 function buildColumnEl(column) {
   const div = document.createElement("div");
-  div.className = "column compact-column";
+  div.className = "column";
   div.dataset.columnId = column.id;
 
   div.innerHTML = `
     <div class="column-header">
       <div class="column-title-wrap">
         <h3>${escHtml(column.name)}</h3>
-        <button type="button" class="tiny-button secondary-button rename-column"
-          data-column-id="${column.id}" data-column-name="${escHtml(column.name)}">Edit</button>
-        <button type="button" class="tiny-button danger delete-column"
-          data-column-id="${column.id}">X</button>
+        <button type="button" class="icon-btn rename-column" title="Rename column"
+          data-column-id="${column.id}" data-column-name="${escHtml(column.name)}">${ICON_PENCIL}</button>
+        <button type="button" class="icon-btn icon-btn-danger delete-column" title="Delete column"
+          data-column-id="${column.id}">${ICON_CROSS}</button>
       </div>
-      <span class="count">0</span>
+      <div class="column-header-right">
+        <button type="button" class="icon-btn add-card-toggle" title="Add card">${ICON_PLUS}</button>
+        <span class="count">0</span>
+      </div>
     </div>
-    <form class="add-card-form compact-form" data-column-id="${column.id}">
-      <input type="text" name="title" placeholder="Add a card…" required />
-      <textarea name="description" placeholder="Optional notes"></textarea>
+    <form class="add-card-form hidden" data-column-id="${column.id}">
+      <input type="text" name="title" placeholder="Card title…" required />
+      <textarea name="description" placeholder="Notes (optional)"></textarea>
       <div class="card-form-row">
         <input type="date" name="due_date" title="Due date" />
         <select name="color" title="Label colour">
@@ -166,13 +194,17 @@ function buildColumnEl(column) {
           <option value="#3b82f6">Blue</option>
           <option value="#a855f7">Purple</option>
         </select>
-        <button type="submit" class="tiny-button">Add</button>
+      </div>
+      <div class="card-form-actions">
+        <button type="submit" class="tiny-button">Add card</button>
+        <button type="button" class="tiny-button secondary-button cancel-add-card">Cancel</button>
       </div>
     </form>
     <div class="card-list" data-column-id="${column.id}"></div>
   `;
 
   wireColumnButtons(div);
+  wireAddCardToggle(div);
   wireAddCardForm(div.querySelector(".add-card-form"));
   wireDragTarget(div.querySelector(".card-list"));
   return div;
@@ -180,7 +212,7 @@ function buildColumnEl(column) {
 
 function buildBoardEl(board) {
   const section = document.createElement("section");
-  section.className = "board-section compact-section";
+  section.className = "board-section";
   section.dataset.boardId = board.id;
 
   const colCount = Math.max(board.columns.length, 1);
@@ -189,18 +221,18 @@ function buildBoardEl(board) {
     <div class="board-header board-header-flex">
       <div class="board-title-wrap">
         <h2 class="board-title">${escHtml(board.name)}</h2>
-        <button type="button" class="tiny-button secondary-button rename-board"
-          data-board-id="${board.id}" data-board-name="${escHtml(board.name)}">Rename</button>
-        <button type="button" class="tiny-button danger delete-board"
-          data-board-id="${board.id}">Delete</button>
+        <button type="button" class="icon-btn rename-board" title="Rename board"
+          data-board-id="${board.id}" data-board-name="${escHtml(board.name)}">${ICON_PENCIL}</button>
+        <button type="button" class="icon-btn icon-btn-danger delete-board" title="Delete board"
+          data-board-id="${board.id}">${ICON_CROSS}</button>
       </div>
       <form class="add-column-form inline-form" data-board-id="${board.id}">
         <input type="text" name="name" placeholder="New column" required />
         <button type="submit" class="tiny-button">Add column</button>
       </form>
     </div>
-    <div class="columns-grid compact-grid dynamic-grid"
-      style="grid-template-columns: repeat(${colCount}, minmax(220px, 1fr));">
+    <div class="columns-grid dynamic-grid"
+      style="grid-template-columns: repeat(${colCount}, minmax(240px, 1fr));">
     </div>
   `;
 
@@ -215,18 +247,28 @@ function buildBoardEl(board) {
   return section;
 }
 
-function escHtml(str) {
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+// --------------------
+// ADD CARD TOGGLE
+// --------------------
 
-function updateColumnCount(columnEl) {
-  const list = columnEl.querySelector(".card-list");
-  const count = columnEl.querySelector(".count");
-  if (list && count) count.textContent = list.querySelectorAll(".card").length;
+function wireAddCardToggle(columnEl) {
+  const toggleBtn = columnEl.querySelector(".add-card-toggle");
+  const form = columnEl.querySelector(".add-card-form");
+  const cancelBtn = columnEl.querySelector(".cancel-add-card");
+
+  if (!toggleBtn || !form) return;
+
+  toggleBtn.addEventListener("click", () => {
+    form.classList.toggle("hidden");
+    if (!form.classList.contains("hidden")) {
+      form.querySelector("input[name='title']").focus();
+    }
+  });
+
+  cancelBtn?.addEventListener("click", () => {
+    form.classList.add("hidden");
+    form.reset();
+  });
 }
 
 // --------------------
@@ -238,29 +280,37 @@ function wireBoardButtons(boardEl) {
   const deleteBtn = boardEl.querySelector(".delete-board");
 
   if (renameBtn) {
-    renameBtn.addEventListener("click", withLoading(renameBtn, async () => {
+    renameBtn.addEventListener("click", async () => {
       const boardId = renameBtn.dataset.boardId;
       const currentName = renameBtn.dataset.boardName;
       const newName = prompt("Rename board:", currentName);
       if (newName === null) return;
       if (!newName.trim()) { showToast("Board name cannot be empty."); return; }
 
-      await postJSON(`/boards/${boardId}/update`, { name: newName.trim() });
-      boardEl.querySelector(".board-title").textContent = newName.trim();
-      renameBtn.dataset.boardName = newName.trim();
-      showToast("Board renamed.", "success");
-    }));
+      try {
+        await postJSON(`/boards/${boardId}/update`, { name: newName.trim() });
+        boardEl.querySelector(".board-title").textContent = newName.trim();
+        renameBtn.dataset.boardName = newName.trim();
+        showToast("Board renamed.", "success");
+      } catch (err) {
+        showToast(err.message);
+      }
+    });
   }
 
   if (deleteBtn) {
-    deleteBtn.addEventListener("click", withLoading(deleteBtn, async () => {
+    deleteBtn.addEventListener("click", async () => {
       const boardId = deleteBtn.dataset.boardId;
       if (!confirm("Delete this board and everything in it?")) return;
 
-      await postJSON(`/boards/${boardId}/delete`);
-      boardEl.remove();
-      showToast("Board deleted.", "success");
-    }));
+      try {
+        await postJSON(`/boards/${boardId}/delete`);
+        boardEl.remove();
+        showToast("Board deleted.", "success");
+      } catch (err) {
+        showToast(err.message);
+      }
+    });
   }
 }
 
@@ -279,10 +329,8 @@ function wireAddBoardForm() {
     try {
       const data = await postJSON("/boards", { name });
       input.value = "";
-
       const boardsWrap = document.querySelector(".boards-wrap");
-      const newBoard = buildBoardEl(data.board);
-      boardsWrap.appendChild(newBoard);
+      boardsWrap.appendChild(buildBoardEl(data.board));
       showToast("Board created.", "success");
     } catch (err) {
       showToast(err.message);
@@ -301,37 +349,43 @@ function wireColumnButtons(columnEl) {
   const deleteBtn = columnEl.querySelector(".delete-column");
 
   if (renameBtn) {
-    renameBtn.addEventListener("click", withLoading(renameBtn, async () => {
+    renameBtn.addEventListener("click", async () => {
       const columnId = renameBtn.dataset.columnId;
       const currentName = renameBtn.dataset.columnName;
       const newName = prompt("Rename column:", currentName);
       if (newName === null) return;
       if (!newName.trim()) { showToast("Column name cannot be empty."); return; }
 
-      await postJSON(`/columns/${columnId}/update`, { name: newName.trim() });
-      columnEl.querySelector("h3").textContent = newName.trim();
-      renameBtn.dataset.columnName = newName.trim();
-      showToast("Column renamed.", "success");
-    }));
+      try {
+        await postJSON(`/columns/${columnId}/update`, { name: newName.trim() });
+        columnEl.querySelector("h3").textContent = newName.trim();
+        renameBtn.dataset.columnName = newName.trim();
+        showToast("Column renamed.", "success");
+      } catch (err) {
+        showToast(err.message);
+      }
+    });
   }
 
   if (deleteBtn) {
-    deleteBtn.addEventListener("click", withLoading(deleteBtn, async () => {
+    deleteBtn.addEventListener("click", async () => {
       const columnId = deleteBtn.dataset.columnId;
       if (!confirm("Delete this column and all cards inside it?")) return;
 
-      await postJSON(`/columns/${columnId}/delete`);
-      const boardEl = columnEl.closest(".board-section");
-      columnEl.remove();
-
-      // Recount columns and update grid template
-      if (boardEl) {
-        const grid = boardEl.querySelector(".columns-grid");
-        const remaining = grid.querySelectorAll(".column").length;
-        grid.style.gridTemplateColumns = `repeat(${Math.max(remaining, 1)}, minmax(220px, 1fr))`;
+      try {
+        await postJSON(`/columns/${columnId}/delete`);
+        const boardEl = columnEl.closest(".board-section");
+        columnEl.remove();
+        if (boardEl) {
+          const grid = boardEl.querySelector(".columns-grid");
+          const remaining = grid.querySelectorAll(".column").length;
+          grid.style.gridTemplateColumns = `repeat(${Math.max(remaining, 1)}, minmax(240px, 1fr))`;
+        }
+        showToast("Column deleted.", "success");
+      } catch (err) {
+        showToast(err.message);
       }
-      showToast("Column deleted.", "success");
-    }));
+    });
   }
 }
 
@@ -349,13 +403,11 @@ function wireAddColumnForm(form) {
     try {
       const data = await postJSON("/columns", { boardId, name });
       input.value = "";
-
       const boardEl = form.closest(".board-section");
       const grid = boardEl.querySelector(".columns-grid");
       grid.appendChild(buildColumnEl(data.column));
-
       const colCount = grid.querySelectorAll(".column").length;
-      grid.style.gridTemplateColumns = `repeat(${colCount}, minmax(220px, 1fr))`;
+      grid.style.gridTemplateColumns = `repeat(${colCount}, minmax(240px, 1fr))`;
       showToast("Column added.", "success");
     } catch (err) {
       showToast(err.message);
@@ -373,30 +425,27 @@ function wireCard(cardEl) {
   const editBtn = cardEl.querySelector(".edit-card");
   const deleteBtn = cardEl.querySelector(".delete-card");
 
-  if (editBtn) {
-    editBtn.addEventListener("click", () => openEditModal(cardEl));
-  }
+  if (editBtn) editBtn.addEventListener("click", () => openEditModal(cardEl));
 
   if (deleteBtn) {
-    deleteBtn.addEventListener("click", withLoading(deleteBtn, async () => {
+    deleteBtn.addEventListener("click", async () => {
       const cardId = cardEl.dataset.cardId;
       if (!confirm("Delete this card?")) return;
 
-      await postJSON(`/cards/${cardId}/delete`);
-      const columnEl = cardEl.closest(".column");
-      cardEl.remove();
-      if (columnEl) updateColumnCount(columnEl);
-      showToast("Card deleted.", "success");
-    }));
+      try {
+        await postJSON(`/cards/${cardId}/delete`);
+        const columnEl = cardEl.closest(".column");
+        cardEl.remove();
+        if (columnEl) updateColumnCount(columnEl);
+        showToast("Card deleted.", "success");
+      } catch (err) {
+        showToast(err.message);
+      }
+    });
   }
 
-  // Drag events
-  cardEl.addEventListener("dragstart", () => {
-    cardEl.classList.add("dragging");
-  });
-  cardEl.addEventListener("dragend", () => {
-    cardEl.classList.remove("dragging");
-  });
+  cardEl.addEventListener("dragstart", () => cardEl.classList.add("dragging"));
+  cardEl.addEventListener("dragend", () => cardEl.classList.remove("dragging"));
 }
 
 function wireAddCardForm(form) {
@@ -415,6 +464,7 @@ function wireAddCardForm(form) {
     try {
       const data = await postJSON("/cards", { columnId, title, description, due_date, color });
       form.reset();
+      form.classList.add("hidden");
 
       const columnEl = form.closest(".column");
       const list = columnEl.querySelector(".card-list");
@@ -440,12 +490,9 @@ function openEditModal(cardEl) {
   document.getElementById("editTitle").value = cardEl.querySelector(".card-title")?.textContent?.trim() || "";
   document.getElementById("editDescription").value = cardEl.querySelector(".card-desc")?.textContent?.trim() || "";
 
-  // Pre-fill due date
-  const badge = cardEl.querySelector(".due-badge");
   const dueDateInput = document.getElementById("editDueDate");
   if (dueDateInput) dueDateInput.value = cardEl.dataset.dueDate || "";
 
-  // Pre-fill colour
   const colorSelect = document.getElementById("editColor");
   if (colorSelect) {
     const borderColor = cardEl.style.borderLeftColor;
@@ -470,11 +517,8 @@ function wireEditModal() {
 
   closeModal?.addEventListener("click", () => modal.classList.add("hidden"));
   modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
-
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !modal.classList.contains("hidden")) {
-      modal.classList.add("hidden");
-    }
+    if (e.key === "Escape" && !modal.classList.contains("hidden")) modal.classList.add("hidden");
   });
 
   editForm.addEventListener("submit", async (e) => {
@@ -491,7 +535,6 @@ function wireEditModal() {
     try {
       await postJSON(`/cards/${cardId}/update`, { title, description, due_date, color });
 
-      // Update card in place without a reload
       const cardEl = document.querySelector(`.card[data-card-id="${cardId}"]`);
       if (cardEl) {
         cardEl.querySelector(".card-title").textContent = title;
@@ -501,21 +544,21 @@ function wireEditModal() {
           if (!desc) {
             desc = document.createElement("p");
             desc.className = "card-desc";
-            cardEl.insertBefore(desc, cardEl.querySelector(".due-badge") || cardEl.querySelector(".card-actions"));
+            const actions = cardEl.querySelector(".due-badge") || null;
+            cardEl.insertBefore(desc, actions);
           }
           desc.textContent = description;
         } else if (desc) {
           desc.remove();
         }
 
-        // Update due date badge
         let badge = cardEl.querySelector(".due-badge");
         if (due_date) {
           const info = formatDueDate(due_date);
           if (info) {
             if (!badge) {
               badge = document.createElement("span");
-              cardEl.insertBefore(badge, cardEl.querySelector(".card-actions"));
+              cardEl.appendChild(badge);
             }
             badge.className = info.cls;
             badge.textContent = info.label;
@@ -526,7 +569,6 @@ function wireEditModal() {
           delete cardEl.dataset.dueDate;
         }
 
-        // Update colour strip
         if (color) {
           cardEl.style.borderLeftColor = color;
           cardEl.style.borderLeftWidth = "3px";
@@ -557,11 +599,8 @@ function wireDragTarget(listEl) {
     const dragging = document.querySelector(".dragging");
     if (!dragging) return;
     const after = getDragAfterElement(listEl, e.clientY);
-    if (after == null) {
-      listEl.appendChild(dragging);
-    } else {
-      listEl.insertBefore(dragging, after);
-    }
+    if (after == null) listEl.appendChild(dragging);
+    else listEl.insertBefore(dragging, after);
   });
 
   listEl.addEventListener("drop", async () => {
@@ -575,8 +614,6 @@ function wireDragTarget(listEl) {
     try {
       await postJSON(`/cards/${dragging.dataset.cardId}/move`, { targetColumnId, newPosition });
       dragging.dataset.columnId = targetColumnId;
-
-      // Update counts on both affected columns
       document.querySelectorAll(".column").forEach(updateColumnCount);
     } catch (err) {
       showToast(err.message);
@@ -602,17 +639,21 @@ function wireDeleteAccount() {
   const btn = document.getElementById("deleteAccountBtn");
   if (!btn) return;
 
-  btn.addEventListener("click", withLoading(btn, async () => {
+  btn.addEventListener("click", async () => {
     if (!confirm("Permanently delete your account and all data? This cannot be undone.")) return;
     if (!confirm("Are you sure? All your boards, columns, and cards will be gone forever.")) return;
 
-    await postJSON("/account/delete");
-    window.location.href = "/login";
-  }));
+    try {
+      await postJSON("/account/delete");
+      window.location.href = "/login";
+    } catch (err) {
+      showToast(err.message);
+    }
+  });
 }
 
 // --------------------
-// INIT — wire up everything already in the server-rendered HTML
+// INIT
 // --------------------
 
 function initPage() {
@@ -623,6 +664,7 @@ function initPage() {
 
   document.querySelectorAll(".column").forEach(colEl => {
     wireColumnButtons(colEl);
+    wireAddCardToggle(colEl);
     wireDragTarget(colEl.querySelector(".card-list"));
   });
 
