@@ -73,6 +73,83 @@ function rgbToHex(rgb) {
 }
 
 // --------------------
+// HAMBURGER MENU
+// --------------------
+
+function wireMenu() {
+  const trigger = document.getElementById("menuTrigger");
+  const menu = document.getElementById("mainMenu");
+  if (!trigger || !menu) return;
+
+  trigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    menu.classList.toggle("hidden");
+  });
+
+  // Close on outside click
+  document.addEventListener("click", (e) => {
+    if (!menu.contains(e.target) && !trigger.contains(e.target)) {
+      menu.classList.add("hidden");
+      // Reset add board form
+      document.getElementById("menuAddBoardForm")?.classList.add("hidden");
+      document.getElementById("menuAddBoard")?.classList.remove("hidden");
+    }
+  });
+
+  // Add board in menu
+  const addBoardItem = document.getElementById("menuAddBoard");
+  const addBoardForm = document.getElementById("menuAddBoardForm");
+  const addBoardSubmit = document.getElementById("menuAddBoardSubmit");
+  const addBoardCancel = document.getElementById("menuAddBoardCancel");
+  const newBoardInput = document.getElementById("newBoardName");
+
+  addBoardItem?.addEventListener("click", () => {
+    addBoardItem.classList.add("hidden");
+    addBoardForm?.classList.remove("hidden");
+    newBoardInput?.focus();
+  });
+
+  addBoardCancel?.addEventListener("click", () => {
+    addBoardForm?.classList.add("hidden");
+    addBoardItem?.classList.remove("hidden");
+    if (newBoardInput) newBoardInput.value = "";
+  });
+
+  addBoardSubmit?.addEventListener("click", async () => {
+    const name = newBoardInput?.value.trim();
+    if (!name) return;
+    addBoardSubmit.disabled = true;
+    try {
+      const data = await postJSON("/boards", { name });
+      if (newBoardInput) newBoardInput.value = "";
+      addBoardForm?.classList.add("hidden");
+      addBoardItem?.classList.remove("hidden");
+      menu.classList.add("hidden");
+      document.querySelector(".boards-wrap").appendChild(buildBoardEl(data.board));
+      showToast("Board created.", "success");
+    } catch (err) { showToast(err.message); }
+    finally { addBoardSubmit.disabled = false; }
+  });
+
+  // Allow Enter key in board name input
+  newBoardInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); addBoardSubmit?.click(); }
+    if (e.key === "Escape") { addBoardCancel?.click(); }
+  });
+
+  // Account deletion
+  document.getElementById("deleteAccountBtn")?.addEventListener("click", async () => {
+    menu.classList.add("hidden");
+    if (!confirm("Permanently delete your account and all data? This cannot be undone.")) return;
+    if (!confirm("Are you sure? Everything will be gone forever.")) return;
+    try {
+      await postJSON("/account/delete");
+      window.location.href = "/login";
+    } catch (err) { showToast(err.message); }
+  });
+}
+
+// --------------------
 // DOM BUILDERS
 // --------------------
 
@@ -154,12 +231,13 @@ function buildColumnEl(column) {
         <input type="date" name="due_date" />
         <select name="color">
           <option value="">No label</option>
+          <option value="#6366f1">Indigo</option>
+          <option value="#a855f7">Violet</option>
           <option value="#ef4444">Red</option>
           <option value="#f97316">Orange</option>
           <option value="#eab308">Yellow</option>
           <option value="#22c55e">Green</option>
           <option value="#3b82f6">Blue</option>
-          <option value="#a855f7">Purple</option>
         </select>
       </div>
       <div class="form-btns">
@@ -259,26 +337,6 @@ function wireBoardControls(boardEl) {
   });
 }
 
-function wireAddBoardForm() {
-  const form = document.getElementById("addBoardForm");
-  if (!form) return;
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const input = document.getElementById("newBoardName");
-    const name = input.value.trim();
-    if (!name) return;
-    const btn = form.querySelector("button[type=submit]");
-    btn.disabled = true;
-    try {
-      const data = await postJSON("/boards", { name });
-      input.value = "";
-      document.querySelector(".boards-wrap").appendChild(buildBoardEl(data.board));
-      showToast("Board created.", "success");
-    } catch (err) { showToast(err.message); }
-    finally { btn.disabled = false; }
-  });
-}
-
 // --------------------
 // COLUMN CONTROLS
 // --------------------
@@ -356,11 +414,8 @@ function wireCard(cardEl) {
     } catch (err) { showToast(err.message); }
   });
 
-  // Mouse drag
   cardEl.addEventListener("dragstart", () => cardEl.classList.add("dragging"));
   cardEl.addEventListener("dragend", () => cardEl.classList.remove("dragging"));
-
-  // Touch drag
   wireTouchDrag(cardEl);
 }
 
@@ -435,7 +490,6 @@ function wireEditModal() {
       const cardEl = document.querySelector(`.card[data-card-id="${cardId}"]`);
       if (cardEl) {
         cardEl.querySelector(".card-title").textContent = title;
-
         let desc = cardEl.querySelector(".card-desc");
         if (description) {
           if (!desc) { desc = document.createElement("p"); desc.className = "card-desc"; cardEl.insertBefore(desc, cardEl.querySelector(".due-badge")); }
@@ -522,20 +576,14 @@ function wireTouchDrag(cardEl) {
     offsetX = touch.clientX - rect.left;
     offsetY = touch.clientY - rect.top;
 
-    // Create a visual clone to drag around
     touchClone = cardEl.cloneNode(true);
     touchClone.style.cssText = `
-      position: fixed;
-      width: ${rect.width}px;
-      left: ${rect.left}px;
-      top: ${rect.top}px;
-      opacity: 0.85;
-      pointer-events: none;
-      z-index: 9999;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-      border-radius: 5px;
-      background: #fff;
-      transform: rotate(1deg);
+      position:fixed; width:${rect.width}px;
+      left:${rect.left}px; top:${rect.top}px;
+      opacity:0.85; pointer-events:none; z-index:9999;
+      box-shadow:0 8px 24px rgba(30,27,75,0.18);
+      border-radius:5px; background:#fff;
+      transform:rotate(1deg);
     `;
     document.body.appendChild(touchClone);
     cardEl.classList.add("dragging");
@@ -544,22 +592,17 @@ function wireTouchDrag(cardEl) {
   cardEl.addEventListener("touchmove", (e) => {
     e.preventDefault();
     const touch = e.touches[0];
-
-    // Move the clone
     touchClone.style.left = `${touch.clientX - offsetX}px`;
     touchClone.style.top = `${touch.clientY - offsetY}px`;
 
-    // Find which card-list we're over
     touchClone.style.display = "none";
     const elBelow = document.elementFromPoint(touch.clientX, touch.clientY);
     touchClone.style.display = "";
 
     const list = elBelow?.closest(".card-list");
     if (!list) return;
-
     lastList = list;
 
-    // Reorder cards visually
     const after = getDragAfterElement(list, touch.clientY);
     if (after == null) list.appendChild(cardEl);
     else list.insertBefore(cardEl, after);
@@ -568,25 +611,7 @@ function wireTouchDrag(cardEl) {
   cardEl.addEventListener("touchend", async () => {
     cardEl.classList.remove("dragging");
     if (touchClone) { touchClone.remove(); touchClone = null; }
-    if (lastList) {
-      await commitCardMove(cardEl, lastList);
-      lastList = null;
-    }
-  });
-}
-
-// --------------------
-// ACCOUNT DELETION
-// --------------------
-
-function wireDeleteAccount() {
-  document.getElementById("deleteAccountBtn")?.addEventListener("click", async () => {
-    if (!confirm("Permanently delete your account and all data? This cannot be undone.")) return;
-    if (!confirm("Are you sure? Everything will be gone forever.")) return;
-    try {
-      await postJSON("/account/delete");
-      window.location.href = "/login";
-    } catch (err) { showToast(err.message); }
+    if (lastList) { await commitCardMove(cardEl, lastList); lastList = null; }
   });
 }
 
@@ -595,7 +620,7 @@ function wireDeleteAccount() {
 // --------------------
 
 function initPage() {
-  wireAddBoardForm();
+  wireMenu();
   document.querySelectorAll(".board-section").forEach(wireBoardControls);
   document.querySelectorAll(".board-col-form").forEach(wireAddColumnForm);
   document.querySelectorAll(".column").forEach(colEl => {
@@ -606,7 +631,6 @@ function initPage() {
   document.querySelectorAll(".add-card-form").forEach(wireAddCardForm);
   document.querySelectorAll(".card").forEach(wireCard);
   wireEditModal();
-  wireDeleteAccount();
 }
 
 initPage();
