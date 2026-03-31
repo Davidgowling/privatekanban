@@ -86,13 +86,10 @@ function wireMenu() {
     menu.classList.toggle("hidden");
   });
 
-  // Close on outside click
   document.addEventListener("click", (e) => {
     if (!menu.contains(e.target) && !trigger.contains(e.target)) {
       menu.classList.add("hidden");
-      // Reset add board form
-      document.getElementById("menuAddBoardForm")?.classList.add("hidden");
-      document.getElementById("menuAddBoard")?.classList.remove("hidden");
+      resetAddBoardForm();
     }
   });
 
@@ -103,17 +100,19 @@ function wireMenu() {
   const addBoardCancel = document.getElementById("menuAddBoardCancel");
   const newBoardInput = document.getElementById("newBoardName");
 
+  function resetAddBoardForm() {
+    addBoardForm?.classList.add("hidden");
+    addBoardItem?.classList.remove("hidden");
+    if (newBoardInput) newBoardInput.value = "";
+  }
+
   addBoardItem?.addEventListener("click", () => {
     addBoardItem.classList.add("hidden");
     addBoardForm?.classList.remove("hidden");
     newBoardInput?.focus();
   });
 
-  addBoardCancel?.addEventListener("click", () => {
-    addBoardForm?.classList.add("hidden");
-    addBoardItem?.classList.remove("hidden");
-    if (newBoardInput) newBoardInput.value = "";
-  });
+  addBoardCancel?.addEventListener("click", resetAddBoardForm);
 
   addBoardSubmit?.addEventListener("click", async () => {
     const name = newBoardInput?.value.trim();
@@ -122,8 +121,7 @@ function wireMenu() {
     try {
       const data = await postJSON("/boards", { name });
       if (newBoardInput) newBoardInput.value = "";
-      addBoardForm?.classList.add("hidden");
-      addBoardItem?.classList.remove("hidden");
+      resetAddBoardForm();
       menu.classList.add("hidden");
       document.querySelector(".boards-wrap").appendChild(buildBoardEl(data.board));
       showToast("Board created.", "success");
@@ -131,17 +129,43 @@ function wireMenu() {
     finally { addBoardSubmit.disabled = false; }
   });
 
-  // Allow Enter key in board name input
   newBoardInput?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); addBoardSubmit?.click(); }
-    if (e.key === "Escape") { addBoardCancel?.click(); }
+    if (e.key === "Escape") resetAddBoardForm();
   });
 
-  // Account deletion
-  document.getElementById("deleteAccountBtn")?.addEventListener("click", async () => {
+  // Settings — opens settings modal
+  document.getElementById("menuSettings")?.addEventListener("click", () => {
     menu.classList.add("hidden");
+    document.getElementById("settingsModal")?.classList.remove("hidden");
+  });
+}
+
+// --------------------
+// SETTINGS MODAL
+// --------------------
+
+function wireSettingsModal() {
+  const modal = document.getElementById("settingsModal");
+  if (!modal) return;
+
+  document.getElementById("closeSettings")?.addEventListener("click", () => {
+    modal.classList.add("hidden");
+  });
+
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) modal.classList.add("hidden");
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !modal.classList.contains("hidden")) {
+      modal.classList.add("hidden");
+    }
+  });
+
+  document.getElementById("deleteAccountBtn")?.addEventListener("click", async () => {
     if (!confirm("Permanently delete your account and all data? This cannot be undone.")) return;
-    if (!confirm("Are you sure? Everything will be gone forever.")) return;
+    if (!confirm("Are you sure? All your boards, columns and cards will be gone forever.")) return;
     try {
       await postJSON("/account/delete");
       window.location.href = "/login";
@@ -621,6 +645,7 @@ function wireTouchDrag(cardEl) {
 
 function initPage() {
   wireMenu();
+  wireSettingsModal();
   document.querySelectorAll(".board-section").forEach(wireBoardControls);
   document.querySelectorAll(".board-col-form").forEach(wireAddColumnForm);
   document.querySelectorAll(".column").forEach(colEl => {

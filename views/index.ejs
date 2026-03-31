@@ -8,7 +8,6 @@
 </head>
 <body>
   <header class="topbar">
-    <!-- Left: hamburger menu -->
     <div class="topbar-left">
       <div class="menu-trigger" id="menuTrigger">
         <div class="hamburger-icon">
@@ -40,21 +39,20 @@
           </div>
         </div>
         <div class="menu-section">
+          <div class="menu-item" id="menuSettings">
+            <span class="menu-icon">&#9881;</span>
+            Settings
+          </div>
           <form method="POST" action="/logout">
             <button type="submit" class="menu-item menu-item-btn">
-              <span class="menu-icon">→</span>
+              <span class="menu-icon">&#8594;</span>
               Logout
             </button>
           </form>
-          <div class="menu-item danger" id="deleteAccountBtn">
-            <span class="menu-icon">✕</span>
-            Delete my account
-          </div>
         </div>
       </div>
     </div>
 
-    <!-- Right: add column form + logo -->
     <div class="topbar-right">
       <span class="app-title">Kanban</span>
       <svg class="app-logo-svg" width="36" height="36" viewBox="0 0 48 48">
@@ -212,6 +210,28 @@
           <button type="button" id="closeModal" class="flat-btn muted">Cancel</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Settings modal -->
+  <div id="settingsModal" class="modal hidden">
+    <div class="modal-card">
+      <h3>Settings</h3>
+
+      <div class="settings-section">
+        <div class="settings-label">Account</div>
+        <p class="settings-desc">Signed in as <strong><%= currentUser %></strong></p>
+      </div>
+
+      <div class="settings-section settings-danger">
+        <div class="settings-label danger">Danger zone</div>
+        <p class="settings-desc">Permanently delete your account and all your boards, columns and cards. This cannot be undone.</p>
+        <button type="button" id="deleteAccountBtn" class="flat-btn danger">Delete my account</button>
+      </div>
+
+      <div class="modal-actions" style="margin-top:20px;">
+        <button type="button" id="closeSettings" class="flat-btn muted">Close</button>
+      </div>
     </div>
   </div>
 
