@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS checklist_items;
 DROP TABLE IF EXISTS cards;
 DROP TABLE IF EXISTS columns_kanban;
 DROP TABLE IF EXISTS boards;
@@ -36,10 +37,21 @@ CREATE TABLE cards (
   position INT NOT NULL DEFAULT 0,
   due_date DATE,
   color VARCHAR(20),
+  archived BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE checklist_items (
+  id SERIAL PRIMARY KEY,
+  card_id INT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+  text VARCHAR(500) NOT NULL,
+  done BOOLEAN NOT NULL DEFAULT false,
+  position INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_boards_user_id ON boards(user_id);
 CREATE INDEX idx_columns_board_id ON columns_kanban(board_id);
 CREATE INDEX idx_cards_column_id ON cards(column_id);
+CREATE INDEX idx_checklist_card_id ON checklist_items(card_id);

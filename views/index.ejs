@@ -39,6 +39,10 @@
           </div>
         </div>
         <div class="menu-section">
+          <div class="menu-item" id="menuArchive">
+            <span class="menu-icon">&#8595;</span>
+            Archive
+          </div>
           <div class="menu-item" id="menuSettings">
             <span class="menu-icon">&#9881;</span>
             Settings
@@ -68,9 +72,13 @@
 
   <main class="boards-wrap">
     <% boards.forEach(board => { %>
+      <%
+        const colCount = Math.max(board.columns.length, 1);
+      %>
       <section class="board-section" data-board-id="<%= board.id %>">
         <div class="board-header">
           <div class="board-title-row">
+            <span class="drag-handle board-drag-handle" title="Drag to reorder">&#10303;</span>
             <h2 class="board-title"><%= board.name %></h2>
             <i class="ic rename-board" title="Rename board"
               data-board-id="<%= board.id %>" data-board-name="<%= board.name %>">&#9998;</i>
@@ -83,10 +91,11 @@
           </form>
         </div>
 
-        <div class="columns-grid" style="grid-template-columns: repeat(<%= Math.max(board.columns.length, 1) %>, minmax(200px, 1fr));">
+        <div class="columns-grid" style="grid-template-columns: repeat(<%= colCount %>, minmax(200px, 1fr));">
           <% board.columns.forEach(column => { %>
             <div class="column" data-column-id="<%= column.id %>">
               <div class="col-header">
+                <span class="drag-handle col-drag-handle" title="Drag to reorder">&#10303;</span>
                 <span class="col-name"><%= column.name %></span>
                 <div class="col-controls">
                   <i class="ic rename-column" title="Rename column"
@@ -135,12 +144,17 @@
                       dueBadgeHtml = `<span class="${cls}">${label}</span>`;
                     }
                     const borderStyle = card.color ? `border-left-color:${card.color};` : '';
+                    const checklistItems = card.checklist || [];
+                    const clTotal = checklistItems.length;
+                    const clDone = checklistItems.filter(i => i.done).length;
+                    const clPct = clTotal > 0 ? Math.round((clDone / clTotal) * 100) : 0;
                   %>
                   <article
                     class="card"
                     draggable="true"
                     data-card-id="<%= card.id %>"
                     data-column-id="<%= column.id %>"
+                    data-checklist="<%= JSON.stringify(checklistItems) %>"
                     <% if (card.due_date) { %>data-due-date="<%= card.due_date %>"<% } %>
                     style="<%= borderStyle %>"
                   >
@@ -148,11 +162,19 @@
                       <strong class="card-title"><%= card.title %></strong>
                       <div class="card-icons">
                         <i class="ic edit-card" title="Edit">&#9998;</i>
-                        <i class="ic del delete-card" title="Delete">&#10005;</i>
+                        <i class="ic archive-card" title="Archive">&#10005;</i>
                       </div>
                     </div>
                     <% if (card.description) { %>
                       <p class="card-desc"><%= card.description %></p>
+                    <% } %>
+                    <% if (clTotal > 0) { %>
+                      <div class="card-checklist-preview">
+                        <span class="checklist-mini-count"><%= clDone %>/<%= clTotal %></span>
+                        <div class="checklist-mini-bar">
+                          <div class="checklist-mini-fill" style="width:<%= clPct %>%<%= clPct === 100 ? ';background:#22c55e' : '' %>"></div>
+                        </div>
+                      </div>
                     <% } %>
                     <%- dueBadgeHtml %>
                   </article>
@@ -174,7 +196,7 @@
 
   <!-- Edit card modal -->
   <div id="editModal" class="modal hidden">
-    <div class="modal-card">
+    <div class="modal-card edit-modal-card">
       <h3>Edit card</h3>
       <form id="editCardForm" class="stack">
         <input type="hidden" id="editCardId" />
@@ -205,11 +227,43 @@
             </select>
           </label>
         </div>
+
+        <!-- Checklist section -->
+        <div class="checklist-wrap">
+          <div class="checklist-header-row">
+            <span class="checklist-section-label">Checklist</span>
+            <span id="checklistProgressText" class="checklist-progress-text"></span>
+          </div>
+          <div class="checklist-bar-outer hidden" id="checklistBarOuter">
+            <div class="checklist-bar-fill" id="checklistBarFill"></div>
+          </div>
+          <div id="checklistItems" class="checklist-items"></div>
+          <div class="checklist-add-row">
+            <input type="text" id="newChecklistText" class="checklist-add-input"
+              placeholder="Add an item…" maxlength="500" autocomplete="off" />
+            <button type="button" id="addChecklistBtn" class="flat-btn">Add</button>
+          </div>
+        </div>
+
         <div class="modal-actions">
           <button type="submit" class="flat-btn">Save</button>
           <button type="button" id="closeModal" class="flat-btn muted">Cancel</button>
+          <span class="modal-actions-spacer"></span>
+          <button type="button" id="archiveFromModal" class="flat-btn muted">Archive</button>
+          <button type="button" id="deletePermFromModal" class="flat-btn danger">Delete</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Archive modal -->
+  <div id="archiveModal" class="modal hidden">
+    <div class="modal-card archive-modal-card">
+      <h3>Archived cards</h3>
+      <div id="archiveContent" class="archive-content"></div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button type="button" id="closeArchiveModal" class="flat-btn muted">Close</button>
+      </div>
     </div>
   </div>
 

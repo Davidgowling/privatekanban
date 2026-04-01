@@ -21,6 +21,7 @@ const PASSWORD_MAX = 72; // bcrypt hard limit
 const NAME_MAX = 100;
 const TITLE_MAX = 255;
 const DESC_MAX = 5000;
+const CHECKLIST_TEXT_MAX = 500;
 
 const DEFAULT_BOARDS = [
   { name: "Work", columns: ["Backlog", "This Week", "Waiting On", "Done"] },
@@ -80,7 +81,7 @@ const apiLimiter = rateLimit({
 
 app.use("/login", authLimiter);
 app.use("/signup", authLimiter);
-app.use(["/boards", "/columns", "/cards", "/account"], apiLimiter);
+app.use(["/boards", "/columns", "/cards", "/account", "/checklist"], apiLimiter);
 
 // --------------------
 // AUTH HELPERS
@@ -91,6 +92,29 @@ function requireAuth(req, res, next) {
     return next();
   }
   return res.redirect("/login");
+}
+
+// --------------------
+// SCHEMA MIGRATION
+// --------------------
+
+async function ensureSchema() {
+  await db.query(
+    `ALTER TABLE cards ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT false`
+  );
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS checklist_items (
+      id         SERIAL PRIMARY KEY,
+      card_id    INT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+      text       VARCHAR(500) NOT NULL,
+      done       BOOLEAN NOT NULL DEFAULT false,
+      position   INT NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.query(
+    `CREATE INDEX IF NOT EXISTS idx_checklist_card_id ON checklist_items(card_id)`
+  );
 }
 
 // --------------------
@@ -120,7 +144,7 @@ async function ensureDefaultsForUser(userId) {
   }
 }
 
-// Replaces the old N+1 getBoardsWithCards — now 3 queries total regardless of data size
+// 4-query fetch: boards → columns → cards (non-archived) → checklist items
 async function getBoardsWithCards(userId) {
   const boardsResult = await db.query(
     `SELECT id, name, position FROM boards WHERE user_id = $1 ORDER BY position, id`,
@@ -142,20 +166,42 @@ async function getBoardsWithCards(userId) {
   const columnIds = columnsResult.rows.map(c => c.id);
 
   let cards = [];
+  let checklistItems = [];
+
   if (columnIds.length > 0) {
     const cardsResult = await db.query(
       `SELECT id, column_id, title, description, position, due_date, color
        FROM cards
-       WHERE column_id = ANY($1)
+       WHERE column_id = ANY($1) AND archived = false
        ORDER BY position, id`,
       [columnIds]
     );
     cards = cardsResult.rows;
+
+    if (cards.length > 0) {
+      const cardIds = cards.map(c => c.id);
+      const checklistResult = await db.query(
+        `SELECT id, card_id, text, done, position
+         FROM checklist_items
+         WHERE card_id = ANY($1)
+         ORDER BY position, id`,
+        [cardIds]
+      );
+      checklistItems = checklistResult.rows;
+    }
   }
 
-  // Assemble in JS
+  // Build checklist lookup
+  const checklistByCard = {};
+  for (const item of checklistItems) {
+    if (!checklistByCard[item.card_id]) checklistByCard[item.card_id] = [];
+    checklistByCard[item.card_id].push(item);
+  }
+
+  // Assemble
   const cardsByColumn = {};
   for (const card of cards) {
+    card.checklist = checklistByCard[card.id] || [];
     if (!cardsByColumn[card.column_id]) cardsByColumn[card.column_id] = [];
     cardsByColumn[card.column_id].push(card);
   }
@@ -298,6 +344,32 @@ app.post("/account/delete", requireAuth, async (req, res) => {
 // BOARDS
 // --------------------
 
+app.post("/boards/reorder", requireAuth, async (req, res) => {
+  const client = await db.pool.connect();
+  try {
+    const { order } = req.body;
+    if (!Array.isArray(order)) return res.status(400).json({ error: "Invalid payload." });
+    await client.query("BEGIN");
+    for (const item of order) {
+      const id = Number(item.id);
+      const position = Number(item.position);
+      if (!id || Number.isNaN(position)) continue;
+      await client.query(
+        `UPDATE boards SET position = $1 WHERE id = $2 AND user_id = $3`,
+        [position, id, req.session.userId]
+      );
+    }
+    await client.query("COMMIT");
+    res.json({ success: true });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(error);
+    res.status(500).json({ error: "Failed to reorder boards." });
+  } finally {
+    client.release();
+  }
+});
+
 app.post("/boards", requireAuth, async (req, res) => {
   try {
     const name = String(req.body.name || "").trim();
@@ -323,7 +395,6 @@ app.post("/boards", requireAuth, async (req, res) => {
       );
     }
 
-    // Return the full new board with empty columns so the frontend can render it
     const columnsResult = await db.query(
       `SELECT id, name, position FROM columns_kanban WHERE board_id = $1 ORDER BY position`,
       [boardId]
@@ -379,6 +450,33 @@ app.post("/boards/:id/delete", requireAuth, async (req, res) => {
 // --------------------
 // COLUMNS
 // --------------------
+
+app.post("/columns/reorder", requireAuth, async (req, res) => {
+  const client = await db.pool.connect();
+  try {
+    const { order } = req.body;
+    if (!Array.isArray(order)) return res.status(400).json({ error: "Invalid payload." });
+    await client.query("BEGIN");
+    for (const item of order) {
+      const id = Number(item.id);
+      const position = Number(item.position);
+      if (!id || Number.isNaN(position)) continue;
+      await client.query(
+        `UPDATE columns_kanban SET position = $1
+         WHERE id = $2 AND board_id IN (SELECT id FROM boards WHERE user_id = $3)`,
+        [position, id, req.session.userId]
+      );
+    }
+    await client.query("COMMIT");
+    res.json({ success: true });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(error);
+    res.status(500).json({ error: "Failed to reorder columns." });
+  } finally {
+    client.release();
+  }
+});
 
 app.post("/columns", requireAuth, async (req, res) => {
   try {
@@ -479,7 +577,7 @@ app.post("/cards", requireAuth, async (req, res) => {
       [columnId, cleanTitle, cleanDesc, Number(nextPosResult.rows[0].next_position), due_date || null, color || null]
     );
 
-    res.json({ success: true, card: insertResult.rows[0] });
+    res.json({ success: true, card: { ...insertResult.rows[0], checklist: [] } });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to create card." });
@@ -512,6 +610,38 @@ app.post("/cards/:id/update", requireAuth, async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to update card." });
+  }
+});
+
+app.post("/cards/:id/archive", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const check = await db.query(
+      `SELECT ca.id FROM cards ca JOIN columns_kanban c ON c.id = ca.column_id JOIN boards b ON b.id = c.board_id WHERE ca.id = $1 AND b.user_id = $2`,
+      [id, req.session.userId]
+    );
+    if (check.rows.length === 0) return res.status(403).json({ error: "Not allowed." });
+    await db.query(`UPDATE cards SET archived = true, updated_at = NOW() WHERE id = $1`, [id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to archive card." });
+  }
+});
+
+app.post("/cards/:id/restore", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const check = await db.query(
+      `SELECT ca.id FROM cards ca JOIN columns_kanban c ON c.id = ca.column_id JOIN boards b ON b.id = c.board_id WHERE ca.id = $1 AND b.user_id = $2`,
+      [id, req.session.userId]
+    );
+    if (check.rows.length === 0) return res.status(403).json({ error: "Not allowed." });
+    await db.query(`UPDATE cards SET archived = false, updated_at = NOW() WHERE id = $1`, [id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to restore card." });
   }
 });
 
@@ -590,6 +720,80 @@ app.post("/cards/:id/move", requireAuth, async (req, res) => {
 });
 
 // --------------------
+// CHECKLIST
+// --------------------
+
+app.post("/cards/:id/checklist", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const text = String(req.body.text || "").trim().slice(0, CHECKLIST_TEXT_MAX);
+    if (!text) return res.status(400).json({ error: "Text is required." });
+
+    const check = await db.query(
+      `SELECT ca.id FROM cards ca JOIN columns_kanban c ON c.id = ca.column_id JOIN boards b ON b.id = c.board_id WHERE ca.id = $1 AND b.user_id = $2`,
+      [id, req.session.userId]
+    );
+    if (check.rows.length === 0) return res.status(403).json({ error: "Not allowed." });
+
+    const nextPos = await db.query(
+      `SELECT COALESCE(MAX(position), -1) + 1 AS next FROM checklist_items WHERE card_id = $1`,
+      [id]
+    );
+    const result = await db.query(
+      `INSERT INTO checklist_items (card_id, text, done, position)
+       VALUES ($1, $2, false, $3)
+       RETURNING id, card_id, text, done, position`,
+      [id, text, Number(nextPos.rows[0].next)]
+    );
+    res.json({ success: true, item: result.rows[0] });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to add checklist item." });
+  }
+});
+
+app.post("/checklist/:id/toggle", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const check = await db.query(
+      `SELECT ci.id, ci.done FROM checklist_items ci
+       JOIN cards ca ON ca.id = ci.card_id
+       JOIN columns_kanban c ON c.id = ca.column_id
+       JOIN boards b ON b.id = c.board_id
+       WHERE ci.id = $1 AND b.user_id = $2`,
+      [id, req.session.userId]
+    );
+    if (check.rows.length === 0) return res.status(403).json({ error: "Not allowed." });
+    const newDone = !check.rows[0].done;
+    await db.query(`UPDATE checklist_items SET done = $1 WHERE id = $2`, [newDone, id]);
+    res.json({ success: true, done: newDone });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to toggle item." });
+  }
+});
+
+app.post("/checklist/:id/delete", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const check = await db.query(
+      `SELECT ci.id FROM checklist_items ci
+       JOIN cards ca ON ca.id = ci.card_id
+       JOIN columns_kanban c ON c.id = ca.column_id
+       JOIN boards b ON b.id = c.board_id
+       WHERE ci.id = $1 AND b.user_id = $2`,
+      [id, req.session.userId]
+    );
+    if (check.rows.length === 0) return res.status(403).json({ error: "Not allowed." });
+    await db.query(`DELETE FROM checklist_items WHERE id = $1`, [id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to delete item." });
+  }
+});
+
+// --------------------
 // API
 // --------------------
 
@@ -603,6 +807,37 @@ app.get("/api/boards", requireAuth, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Kanban running on http://localhost:${PORT}`);
+app.get("/api/archive", requireAuth, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT ca.id, ca.title, ca.description, ca.due_date, ca.color,
+              c.id AS column_id, c.name AS column_name,
+              b.id AS board_id, b.name AS board_name
+       FROM cards ca
+       JOIN columns_kanban c ON c.id = ca.column_id
+       JOIN boards b ON b.id = c.board_id
+       WHERE b.user_id = $1 AND ca.archived = true
+       ORDER BY b.name, ca.updated_at DESC`,
+      [req.session.userId]
+    );
+    res.json({ cards: result.rows });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to load archive." });
+  }
 });
+
+// --------------------
+// START
+// --------------------
+
+ensureSchema()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Kanban running on http://localhost:${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error("Schema migration failed:", err);
+    process.exit(1);
+  });
