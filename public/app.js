@@ -73,8 +73,30 @@ function rgbToHex(rgb) {
 }
 
 // --------------------
+// MODULE STATE
+// --------------------
+
+let editingCardEl = null;
+let currentChecklistItems = [];
+
+// --------------------
 // DOM BUILDERS
 // --------------------
+
+function buildChecklistPreview(items) {
+  const total = items.length;
+  const done = items.filter(i => i.done).length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const div = document.createElement("div");
+  div.className = "card-checklist-preview";
+  div.innerHTML = `
+    <span class="checklist-mini-count">${done}/${total}</span>
+    <div class="checklist-mini-bar">
+      <div class="checklist-mini-fill" style="width:${pct}%;${pct === 100 ? "background:#22c55e" : ""}"></div>
+    </div>
+  `;
+  return div;
+}
 
 function buildCardEl(card) {
   const article = document.createElement("article");
@@ -82,6 +104,7 @@ function buildCardEl(card) {
   article.draggable = true;
   article.dataset.cardId = card.id;
   article.dataset.columnId = card.column_id;
+  article.dataset.checklist = JSON.stringify(card.checklist || []);
   if (card.color) article.style.borderLeftColor = card.color;
 
   const top = document.createElement("div");
@@ -115,6 +138,10 @@ function buildCardEl(card) {
     desc.className = "card-desc";
     desc.textContent = card.description;
     article.appendChild(desc);
+  }
+
+  if ((card.checklist || []).length > 0) {
+    article.appendChild(buildChecklistPreview(card.checklist));
   }
 
   if (card.due_date) {
@@ -356,11 +383,10 @@ function wireCard(cardEl) {
     } catch (err) { showToast(err.message); }
   });
 
-  // Mouse drag
+  // Original working drag — plain and simple
   cardEl.addEventListener("dragstart", () => cardEl.classList.add("dragging"));
   cardEl.addEventListener("dragend", () => cardEl.classList.remove("dragging"));
 
-  // Touch drag
   wireTouchDrag(cardEl);
 }
 
@@ -391,19 +417,250 @@ function wireAddCardForm(form) {
 }
 
 // --------------------
+// CHECKLIST HELPERS
+// --------------------
+
+function updateChecklistProgress(items) {
+  const total = items.length;
+  const done = items.filter(i => i.done).length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  const progressText = document.getElementById("checklistProgressText");
+  if (progressText) progressText.textContent = total > 0 ? `${done}/${total}` : "";
+
+  const barOuter = document.getElementById("checklistBarOuter");
+  if (barOuter) barOuter.classList.toggle("hidden", total === 0);
+
+  const fill = document.getElementById("checklistBarFill");
+  if (fill) {
+    fill.style.width = `${pct}%`;
+    fill.style.background = pct === 100 ? "#22c55e" : "#4f46e5";
+  }
+}
+
+function updateCardChecklistPreview(cardEl, items) {
+  let preview = cardEl.querySelector(".card-checklist-preview");
+  if (items.length === 0) {
+    if (preview) preview.remove();
+    return;
+  }
+  const total = items.length;
+  const done = items.filter(i => i.done).length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  if (!preview) {
+    preview = document.createElement("div");
+    preview.className = "card-checklist-preview";
+    const badge = cardEl.querySelector(".due-badge");
+    if (badge) cardEl.insertBefore(preview, badge);
+    else cardEl.appendChild(preview);
+  }
+  preview.innerHTML = `
+    <span class="checklist-mini-count">${done}/${total}</span>
+    <div class="checklist-mini-bar">
+      <div class="checklist-mini-fill" style="width:${pct}%;${pct === 100 ? "background:#22c55e" : ""}"></div>
+    </div>
+  `;
+}
+
+function syncChecklistToCard() {
+  if (!editingCardEl) return;
+  editingCardEl.dataset.checklist = JSON.stringify(currentChecklistItems);
+  updateCardChecklistPreview(editingCardEl, currentChecklistItems);
+}
+
+function buildChecklistItemEl(item) {
+  const div = document.createElement("div");
+  div.className = "checklist-item";
+  div.dataset.itemId = item.id;
+
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = item.done;
+  checkbox.className = "checklist-checkbox";
+
+  const label = document.createElement("span");
+  label.className = "checklist-item-text" + (item.done ? " done" : "");
+  label.textContent = item.text;
+
+  const delBtn = document.createElement("button");
+  delBtn.type = "button";
+  delBtn.className = "checklist-del-btn";
+  delBtn.innerHTML = "&#10005;";
+  delBtn.title = "Remove";
+
+  div.appendChild(checkbox);
+  div.appendChild(label);
+  div.appendChild(delBtn);
+
+  checkbox.addEventListener("change", async () => {
+    try {
+      const data = await postJSON(`/checklist/${item.id}/toggle`);
+      item.done = data.done;
+      label.className = "checklist-item-text" + (item.done ? " done" : "");
+      updateChecklistProgress(currentChecklistItems);
+      syncChecklistToCard();
+    } catch (err) {
+      checkbox.checked = !checkbox.checked;
+      showToast(err.message);
+    }
+  });
+
+  delBtn.addEventListener("click", async () => {
+    try {
+      await postJSON(`/checklist/${item.id}/delete`);
+      const idx = currentChecklistItems.findIndex(i => i.id === item.id);
+      if (idx !== -1) currentChecklistItems.splice(idx, 1);
+      div.remove();
+      updateChecklistProgress(currentChecklistItems);
+      syncChecklistToCard();
+    } catch (err) { showToast(err.message); }
+  });
+
+  return div;
+}
+
+function renderChecklistItems(items) {
+  const container = document.getElementById("checklistItems");
+  if (!container) return;
+  container.innerHTML = "";
+  for (const item of items) {
+    container.appendChild(buildChecklistItemEl(item));
+  }
+}
+
+// --------------------
+// ARCHIVE
+// --------------------
+
+function wireArchiveBtn() {
+  document.getElementById("archiveBtn")?.addEventListener("click", openArchiveModal);
+}
+
+function openArchiveModal() {
+  const modal = document.getElementById("archiveModal");
+  const content = document.getElementById("archiveContent");
+  if (!modal || !content) return;
+
+  content.innerHTML = '<p class="archive-empty">Loading…</p>';
+  modal.classList.remove("hidden");
+
+  fetch("/api/archive")
+    .then(r => r.json())
+    .then(data => {
+      if (!data.cards || data.cards.length === 0) {
+        content.innerHTML = '<p class="archive-empty">No archived cards.</p>';
+        return;
+      }
+
+      const byBoard = {};
+      for (const card of data.cards) {
+        if (!byBoard[card.board_id]) byBoard[card.board_id] = { name: card.board_name, cards: [] };
+        byBoard[card.board_id].cards.push(card);
+      }
+
+      content.innerHTML = "";
+      for (const group of Object.values(byBoard)) {
+        const section = document.createElement("div");
+        section.className = "archive-board-group";
+
+        const heading = document.createElement("div");
+        heading.className = "archive-board-name";
+        heading.textContent = group.name;
+        section.appendChild(heading);
+
+        for (const card of group.cards) {
+          const item = document.createElement("div");
+          item.className = "archive-card-item";
+          if (card.color) item.style.borderLeftColor = card.color;
+
+          const info = document.createElement("div");
+          info.className = "archive-card-info";
+          info.innerHTML = `<strong>${escHtml(card.title)}</strong><span class="archive-card-col">in ${escHtml(card.column_name)}</span>`;
+
+          const actions = document.createElement("div");
+          actions.className = "archive-card-actions";
+
+          const restoreBtn = document.createElement("button");
+          restoreBtn.type = "button";
+          restoreBtn.className = "flat-btn";
+          restoreBtn.textContent = "Restore";
+          restoreBtn.addEventListener("click", async () => {
+            try {
+              await postJSON(`/cards/${card.id}/restore`);
+              item.remove();
+              showToast("Card restored.", "success");
+              setTimeout(() => window.location.reload(), 800);
+            } catch (err) { showToast(err.message); }
+          });
+
+          const deleteBtn = document.createElement("button");
+          deleteBtn.type = "button";
+          deleteBtn.className = "flat-btn danger";
+          deleteBtn.textContent = "Delete";
+          deleteBtn.addEventListener("click", async () => {
+            if (!confirm("Permanently delete this card?")) return;
+            try {
+              await postJSON(`/cards/${card.id}/delete`);
+              item.remove();
+              if (content.querySelectorAll(".archive-card-item").length === 0) {
+                content.innerHTML = '<p class="archive-empty">No archived cards.</p>';
+              }
+              showToast("Card deleted.", "success");
+            } catch (err) { showToast(err.message); }
+          });
+
+          actions.appendChild(restoreBtn);
+          actions.appendChild(deleteBtn);
+          item.appendChild(info);
+          item.appendChild(actions);
+          section.appendChild(item);
+        }
+        content.appendChild(section);
+      }
+    })
+    .catch(() => {
+      content.innerHTML = '<p class="archive-empty">Failed to load archive.</p>';
+    });
+}
+
+function wireArchiveModal() {
+  const modal = document.getElementById("archiveModal");
+  if (!modal) return;
+  document.getElementById("closeArchiveModal")?.addEventListener("click", () => modal.classList.add("hidden"));
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
+}
+
+// --------------------
 // EDIT MODAL
 // --------------------
 
 function openEditModal(cardEl) {
   const modal = document.getElementById("editModal");
   if (!modal) return;
+
+  editingCardEl = cardEl;
   document.getElementById("editCardId").value = cardEl.dataset.cardId;
   document.getElementById("editTitle").value = cardEl.querySelector(".card-title")?.textContent?.trim() || "";
   document.getElementById("editDescription").value = cardEl.querySelector(".card-desc")?.textContent?.trim() || "";
+
   const dueDateInput = document.getElementById("editDueDate");
   if (dueDateInput) dueDateInput.value = cardEl.dataset.dueDate || "";
+
   const colorSelect = document.getElementById("editColor");
   if (colorSelect) colorSelect.value = cardEl.style.borderLeftColor ? rgbToHex(cardEl.style.borderLeftColor) : "";
+
+  try {
+    currentChecklistItems = JSON.parse(cardEl.dataset.checklist || "[]");
+  } catch (_) {
+    currentChecklistItems = [];
+  }
+  renderChecklistItems(currentChecklistItems);
+  updateChecklistProgress(currentChecklistItems);
+
+  const addInput = document.getElementById("newChecklistText");
+  if (addInput) addInput.value = "";
+
   modal.classList.remove("hidden");
   document.getElementById("editTitle").focus();
 }
@@ -413,12 +670,68 @@ function wireEditModal() {
   const editForm = document.getElementById("editCardForm");
   if (!modal || !editForm) return;
 
-  document.getElementById("closeModal")?.addEventListener("click", () => modal.classList.add("hidden"));
-  modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
+  const closeModal = () => {
+    modal.classList.add("hidden");
+    editingCardEl = null;
+    currentChecklistItems = [];
+  };
+
+  document.getElementById("closeModal")?.addEventListener("click", closeModal);
+  modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !modal.classList.contains("hidden")) modal.classList.add("hidden");
+    if (e.key === "Escape" && !modal.classList.contains("hidden")) closeModal();
   });
 
+  // Add checklist item
+  const addChecklistBtn = document.getElementById("addChecklistBtn");
+  const newChecklistText = document.getElementById("newChecklistText");
+
+  const doAddChecklistItem = async () => {
+    const text = newChecklistText?.value.trim();
+    if (!text || !editingCardEl) return;
+    const cardId = document.getElementById("editCardId").value;
+    addChecklistBtn.disabled = true;
+    try {
+      const data = await postJSON(`/cards/${cardId}/checklist`, { text });
+      if (newChecklistText) newChecklistText.value = "";
+      currentChecklistItems.push(data.item);
+      document.getElementById("checklistItems")?.appendChild(buildChecklistItemEl(data.item));
+      updateChecklistProgress(currentChecklistItems);
+      syncChecklistToCard();
+    } catch (err) { showToast(err.message); }
+    finally { addChecklistBtn.disabled = false; }
+  };
+
+  addChecklistBtn?.addEventListener("click", doAddChecklistItem);
+  newChecklistText?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); doAddChecklistItem(); }
+  });
+
+  // Archive from modal
+  document.getElementById("archiveFromModal")?.addEventListener("click", async () => {
+    if (!editingCardEl) return;
+    const cardId = document.getElementById("editCardId").value;
+    try {
+      await postJSON(`/cards/${cardId}/archive`);
+      const columnEl = editingCardEl.closest(".column");
+      editingCardEl.remove();
+      if (columnEl) updateColumnCount(columnEl);
+      closeModal();
+      showToast("Card archived.", "success");
+    } catch (err) { showToast(err.message); }
+  });
+
+  // Delete account
+  document.getElementById("deleteAccountBtn")?.addEventListener("click", async () => {
+    if (!confirm("Permanently delete your account and all data? This cannot be undone.")) return;
+    if (!confirm("Are you sure? Everything will be gone forever.")) return;
+    try {
+      await postJSON("/account/delete");
+      window.location.href = "/login";
+    } catch (err) { showToast(err.message); }
+  });
+
+  // Save card
   editForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const cardId = document.getElementById("editCardId").value;
@@ -432,13 +745,19 @@ function wireEditModal() {
     try {
       await postJSON(`/cards/${cardId}/update`, { title, description, due_date, color });
 
-      const cardEl = document.querySelector(`.card[data-card-id="${cardId}"]`);
+      const cardEl = editingCardEl;
       if (cardEl) {
         cardEl.querySelector(".card-title").textContent = title;
 
         let desc = cardEl.querySelector(".card-desc");
         if (description) {
-          if (!desc) { desc = document.createElement("p"); desc.className = "card-desc"; cardEl.insertBefore(desc, cardEl.querySelector(".due-badge")); }
+          if (!desc) {
+            desc = document.createElement("p");
+            desc.className = "card-desc";
+            const anchor = cardEl.querySelector(".card-checklist-preview") || cardEl.querySelector(".due-badge");
+            if (anchor) cardEl.insertBefore(desc, anchor);
+            else cardEl.appendChild(desc);
+          }
           desc.textContent = description;
         } else if (desc) desc.remove();
 
@@ -456,7 +775,7 @@ function wireEditModal() {
         cardEl.style.borderLeftColor = color || "";
       }
 
-      modal.classList.add("hidden");
+      closeModal();
       showToast("Card saved.", "success");
     } catch (err) { showToast(err.message); }
     finally { btn.disabled = false; }
@@ -465,6 +784,7 @@ function wireEditModal() {
 
 // --------------------
 // MOUSE DRAG AND DROP
+// Original working implementation — do not modify
 // --------------------
 
 function wireDragTarget(listEl) {
@@ -522,7 +842,6 @@ function wireTouchDrag(cardEl) {
     offsetX = touch.clientX - rect.left;
     offsetY = touch.clientY - rect.top;
 
-    // Create a visual clone to drag around
     touchClone = cardEl.cloneNode(true);
     touchClone.style.cssText = `
       position: fixed;
@@ -544,22 +863,17 @@ function wireTouchDrag(cardEl) {
   cardEl.addEventListener("touchmove", (e) => {
     e.preventDefault();
     const touch = e.touches[0];
-
-    // Move the clone
     touchClone.style.left = `${touch.clientX - offsetX}px`;
     touchClone.style.top = `${touch.clientY - offsetY}px`;
 
-    // Find which card-list we're over
     touchClone.style.display = "none";
     const elBelow = document.elementFromPoint(touch.clientX, touch.clientY);
     touchClone.style.display = "";
 
     const list = elBelow?.closest(".card-list");
     if (!list) return;
-
     lastList = list;
 
-    // Reorder cards visually
     const after = getDragAfterElement(list, touch.clientY);
     if (after == null) list.appendChild(cardEl);
     else list.insertBefore(cardEl, after);
@@ -568,25 +882,7 @@ function wireTouchDrag(cardEl) {
   cardEl.addEventListener("touchend", async () => {
     cardEl.classList.remove("dragging");
     if (touchClone) { touchClone.remove(); touchClone = null; }
-    if (lastList) {
-      await commitCardMove(cardEl, lastList);
-      lastList = null;
-    }
-  });
-}
-
-// --------------------
-// ACCOUNT DELETION
-// --------------------
-
-function wireDeleteAccount() {
-  document.getElementById("deleteAccountBtn")?.addEventListener("click", async () => {
-    if (!confirm("Permanently delete your account and all data? This cannot be undone.")) return;
-    if (!confirm("Are you sure? Everything will be gone forever.")) return;
-    try {
-      await postJSON("/account/delete");
-      window.location.href = "/login";
-    } catch (err) { showToast(err.message); }
+    if (lastList) { await commitCardMove(cardEl, lastList); lastList = null; }
   });
 }
 
@@ -596,17 +892,21 @@ function wireDeleteAccount() {
 
 function initPage() {
   wireAddBoardForm();
+  wireArchiveBtn();
+  wireArchiveModal();
+
   document.querySelectorAll(".board-section").forEach(wireBoardControls);
   document.querySelectorAll(".board-col-form").forEach(wireAddColumnForm);
+
   document.querySelectorAll(".column").forEach(colEl => {
     wireColumnControls(colEl);
     wireAddCardToggle(colEl);
     wireDragTarget(colEl.querySelector(".card-list"));
   });
+
   document.querySelectorAll(".add-card-form").forEach(wireAddCardForm);
   document.querySelectorAll(".card").forEach(wireCard);
   wireEditModal();
-  wireDeleteAccount();
 }
 
 initPage();

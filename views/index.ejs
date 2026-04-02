@@ -21,6 +21,8 @@
         <button type="submit" class="flat-btn">Add board</button>
       </form>
       <div class="topbar-divider"></div>
+      <button type="button" class="flat-btn muted" id="archiveBtn">Archive</button>
+      <div class="topbar-divider"></div>
       <form method="POST" action="/logout">
         <button type="submit" class="flat-btn muted">Logout</button>
       </form>
@@ -95,12 +97,20 @@
                       dueBadgeHtml = `<span class="${cls}">${label}</span>`;
                     }
                     const borderStyle = card.color ? `border-left-color:${card.color};` : '';
+                    const checklistData = JSON.stringify(card.checklist || []);
+                    const checklistPreview = (card.checklist && card.checklist.length > 0) ? (() => {
+                      const total = card.checklist.length;
+                      const done = card.checklist.filter(i => i.done).length;
+                      const pct = Math.round((done / total) * 100);
+                      return `<div class="card-checklist-preview"><span class="checklist-mini-count">${done}/${total}</span><div class="checklist-mini-bar"><div class="checklist-mini-fill" style="width:${pct}%;${pct===100?'background:#22c55e':''}"></div></div></div>`;
+                    })() : '';
                   %>
                   <article
                     class="card"
                     draggable="true"
                     data-card-id="<%= card.id %>"
                     data-column-id="<%= column.id %>"
+                    data-checklist="<%- checklistData.replace(/"/g, '&quot;') %>"
                     <% if (card.due_date) { %>data-due-date="<%= card.due_date %>"<% } %>
                     style="<%= borderStyle %>"
                   >
@@ -114,6 +124,7 @@
                     <% if (card.description) { %>
                       <p class="card-desc"><%= card.description %></p>
                     <% } %>
+                    <%- checklistPreview %>
                     <%- dueBadgeHtml %>
                   </article>
                 <% }) %>
@@ -132,8 +143,9 @@
     <% } %>
   </main>
 
+  <!-- Edit card modal -->
   <div id="editModal" class="modal hidden">
-    <div class="modal-card">
+    <div class="modal-card modal-card-wide">
       <h3>Edit card</h3>
       <form id="editCardForm" class="stack">
         <input type="hidden" id="editCardId" />
@@ -163,14 +175,43 @@
             </select>
           </label>
         </div>
+
+        <!-- Checklist -->
+        <div class="checklist-section">
+          <div class="checklist-header">
+            <span class="checklist-title">Checklist</span>
+            <span id="checklistProgressText" class="checklist-progress-text"></span>
+          </div>
+          <div id="checklistBarOuter" class="checklist-bar-outer hidden">
+            <div id="checklistBarFill" class="checklist-bar-fill"></div>
+          </div>
+          <div id="checklistItems"></div>
+          <div class="checklist-add-row">
+            <input type="text" id="newChecklistText" placeholder="Add an item…" class="checklist-add-input" />
+            <button type="button" id="addChecklistBtn" class="flat-btn">Add</button>
+          </div>
+        </div>
+
         <div class="modal-actions">
           <button type="submit" class="flat-btn">Save</button>
+          <button type="button" id="archiveFromModal" class="flat-btn muted">Archive</button>
           <button type="button" id="closeModal" class="flat-btn muted">Cancel</button>
         </div>
       </form>
       <div class="danger-zone">
         <p>Permanently delete your account and all data.</p>
         <button type="button" id="deleteAccountBtn" class="flat-btn danger">Delete my account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Archive modal -->
+  <div id="archiveModal" class="modal hidden">
+    <div class="modal-card">
+      <h3>Archived cards</h3>
+      <div id="archiveContent"></div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button type="button" id="closeArchiveModal" class="flat-btn muted">Close</button>
       </div>
     </div>
   </div>
