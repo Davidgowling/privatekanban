@@ -709,14 +709,21 @@ function wireCard(cardEl) {
     } catch (err) { showToast(err.message); }
   });
 
-  cardEl.addEventListener("dragstart", () => {
-    cardEl.classList.add("dragging");
+  // KEY FIX: use dragend to commit the move — dragend always fires reliably
+  // dragover moves the card visually, dragend reads its new position and saves it
+  cardEl.addEventListener("dragstart", (e) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", cardEl.dataset.cardId);
+    requestAnimationFrame(() => cardEl.classList.add("dragging"));
     document.body.classList.add("is-dragging");
   });
 
-  cardEl.addEventListener("dragend", () => {
+  cardEl.addEventListener("dragend", async () => {
     cardEl.classList.remove("dragging");
     document.body.classList.remove("is-dragging");
+    // Card is already in its new DOM position from dragover — just commit it
+    const list = cardEl.closest(".card-list");
+    if (list) await commitCardMove(cardEl, list);
   });
 
   wireTouchDrag(cardEl);
@@ -1022,23 +1029,20 @@ function wireEditModal() {
 // MOUSE DRAG AND DROP (CARDS)
 // --------------------
 
+// dragover moves the card visually into its new position in the DOM.
+// dragend then reads where the card ended up and commits it to the server.
+// This is more reliable than using the drop event which can fail to fire.
+
 function wireDragTarget(listEl) {
   listEl.addEventListener("dragover", (e) => {
     if (draggingColumn || draggingBoard) return;
     e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
     const dragging = document.querySelector(".dragging");
     if (!dragging) return;
     const after = getDragAfterElement(listEl, e.clientY);
     if (after == null) listEl.appendChild(dragging);
     else listEl.insertBefore(dragging, after);
-  });
-
-  listEl.addEventListener("drop", async (e) => {
-    if (draggingColumn || draggingBoard) return;
-    e.preventDefault();
-    const dragging = document.querySelector(".dragging");
-    if (!dragging) return;
-    await commitCardMove(dragging, listEl);
   });
 }
 
