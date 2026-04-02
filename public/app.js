@@ -80,6 +80,200 @@ let editingCardEl = null;
 let currentChecklistItems = [];
 
 // --------------------
+// HAMBURGER MENU
+// --------------------
+
+function wireMenu() {
+  const trigger = document.getElementById("menuTrigger");
+  const menu = document.getElementById("mainMenu");
+  if (!trigger || !menu) return;
+
+  trigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    menu.classList.toggle("hidden");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!menu.contains(e.target) && !trigger.contains(e.target)) {
+      menu.classList.add("hidden");
+      resetAddBoardForm();
+    }
+  });
+
+  const addBoardItem = document.getElementById("menuAddBoard");
+  const addBoardForm = document.getElementById("menuAddBoardForm");
+  const addBoardSubmit = document.getElementById("menuAddBoardSubmit");
+  const addBoardCancel = document.getElementById("menuAddBoardCancel");
+  const newBoardInput = document.getElementById("newBoardName");
+
+  function resetAddBoardForm() {
+    addBoardForm?.classList.add("hidden");
+    addBoardItem?.classList.remove("hidden");
+    if (newBoardInput) newBoardInput.value = "";
+  }
+
+  addBoardItem?.addEventListener("click", () => {
+    addBoardItem.classList.add("hidden");
+    addBoardForm?.classList.remove("hidden");
+    newBoardInput?.focus();
+  });
+
+  addBoardCancel?.addEventListener("click", resetAddBoardForm);
+
+  addBoardSubmit?.addEventListener("click", async () => {
+    const name = newBoardInput?.value.trim();
+    if (!name) return;
+    addBoardSubmit.disabled = true;
+    try {
+      const data = await postJSON("/boards", { name });
+      if (newBoardInput) newBoardInput.value = "";
+      resetAddBoardForm();
+      menu.classList.add("hidden");
+      document.querySelector(".boards-wrap").appendChild(buildBoardEl(data.board));
+      showToast("Board created.", "success");
+    } catch (err) { showToast(err.message); }
+    finally { addBoardSubmit.disabled = false; }
+  });
+
+  newBoardInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); addBoardSubmit?.click(); }
+    if (e.key === "Escape") resetAddBoardForm();
+  });
+
+  document.getElementById("menuArchive")?.addEventListener("click", () => {
+    menu.classList.add("hidden");
+    openArchiveModal();
+  });
+
+  document.getElementById("menuSettings")?.addEventListener("click", () => {
+    menu.classList.add("hidden");
+    document.getElementById("settingsModal")?.classList.remove("hidden");
+  });
+}
+
+// --------------------
+// SETTINGS MODAL
+// --------------------
+
+function wireSettingsModal() {
+  const modal = document.getElementById("settingsModal");
+  if (!modal) return;
+
+  document.getElementById("closeSettings")?.addEventListener("click", () => modal.classList.add("hidden"));
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !modal.classList.contains("hidden")) modal.classList.add("hidden");
+  });
+
+  document.getElementById("deleteAccountBtn")?.addEventListener("click", async () => {
+    if (!confirm("Permanently delete your account and all data? This cannot be undone.")) return;
+    if (!confirm("Are you sure? All your boards, columns and cards will be gone forever.")) return;
+    try {
+      await postJSON("/account/delete");
+      window.location.href = "/login";
+    } catch (err) { showToast(err.message); }
+  });
+}
+
+// --------------------
+// ARCHIVE
+// --------------------
+
+function openArchiveModal() {
+  const modal = document.getElementById("archiveModal");
+  const content = document.getElementById("archiveContent");
+  if (!modal || !content) return;
+
+  content.innerHTML = '<p class="archive-empty">Loading…</p>';
+  modal.classList.remove("hidden");
+
+  fetch("/api/archive")
+    .then(r => r.json())
+    .then(data => {
+      if (!data.cards || data.cards.length === 0) {
+        content.innerHTML = '<p class="archive-empty">No archived cards.</p>';
+        return;
+      }
+
+      const byBoard = {};
+      for (const card of data.cards) {
+        if (!byBoard[card.board_id]) byBoard[card.board_id] = { name: card.board_name, cards: [] };
+        byBoard[card.board_id].cards.push(card);
+      }
+
+      content.innerHTML = "";
+      for (const group of Object.values(byBoard)) {
+        const section = document.createElement("div");
+        section.className = "archive-board-group";
+
+        const heading = document.createElement("div");
+        heading.className = "archive-board-name";
+        heading.textContent = group.name;
+        section.appendChild(heading);
+
+        for (const card of group.cards) {
+          const item = document.createElement("div");
+          item.className = "archive-card-item";
+          if (card.color) item.style.borderLeftColor = card.color;
+
+          const info = document.createElement("div");
+          info.className = "archive-card-info";
+          info.innerHTML = `<strong>${escHtml(card.title)}</strong><span class="archive-card-col">in ${escHtml(card.column_name)}</span>`;
+
+          const actions = document.createElement("div");
+          actions.className = "archive-card-actions";
+
+          const restoreBtn = document.createElement("button");
+          restoreBtn.type = "button";
+          restoreBtn.className = "flat-btn";
+          restoreBtn.textContent = "Restore";
+          restoreBtn.addEventListener("click", async () => {
+            try {
+              await postJSON(`/cards/${card.id}/restore`);
+              item.remove();
+              showToast("Card restored.", "success");
+              setTimeout(() => window.location.reload(), 800);
+            } catch (err) { showToast(err.message); }
+          });
+
+          const deleteBtn = document.createElement("button");
+          deleteBtn.type = "button";
+          deleteBtn.className = "flat-btn danger";
+          deleteBtn.textContent = "Delete";
+          deleteBtn.addEventListener("click", async () => {
+            if (!confirm("Permanently delete this card?")) return;
+            try {
+              await postJSON(`/cards/${card.id}/delete`);
+              item.remove();
+              if (content.querySelectorAll(".archive-card-item").length === 0) {
+                content.innerHTML = '<p class="archive-empty">No archived cards.</p>';
+              }
+              showToast("Card deleted.", "success");
+            } catch (err) { showToast(err.message); }
+          });
+
+          actions.appendChild(restoreBtn);
+          actions.appendChild(deleteBtn);
+          item.appendChild(info);
+          item.appendChild(actions);
+          section.appendChild(item);
+        }
+        content.appendChild(section);
+      }
+    })
+    .catch(() => {
+      content.innerHTML = '<p class="archive-empty">Failed to load archive.</p>';
+    });
+}
+
+function wireArchiveModal() {
+  const modal = document.getElementById("archiveModal");
+  if (!modal) return;
+  document.getElementById("closeArchiveModal")?.addEventListener("click", () => modal.classList.add("hidden"));
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
+}
+
+// --------------------
 // DOM BUILDERS
 // --------------------
 
@@ -286,26 +480,6 @@ function wireBoardControls(boardEl) {
   });
 }
 
-function wireAddBoardForm() {
-  const form = document.getElementById("addBoardForm");
-  if (!form) return;
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const input = document.getElementById("newBoardName");
-    const name = input.value.trim();
-    if (!name) return;
-    const btn = form.querySelector("button[type=submit]");
-    btn.disabled = true;
-    try {
-      const data = await postJSON("/boards", { name });
-      input.value = "";
-      document.querySelector(".boards-wrap").appendChild(buildBoardEl(data.board));
-      showToast("Board created.", "success");
-    } catch (err) { showToast(err.message); }
-    finally { btn.disabled = false; }
-  });
-}
-
 // --------------------
 // COLUMN CONTROLS
 // --------------------
@@ -383,7 +557,7 @@ function wireCard(cardEl) {
     } catch (err) { showToast(err.message); }
   });
 
-  // Original working drag — plain and simple
+  // Original working drag — plain and simple, do not modify
   cardEl.addEventListener("dragstart", () => cardEl.classList.add("dragging"));
   cardEl.addEventListener("dragend", () => cardEl.classList.remove("dragging"));
 
@@ -530,108 +704,6 @@ function renderChecklistItems(items) {
 }
 
 // --------------------
-// ARCHIVE
-// --------------------
-
-function wireArchiveBtn() {
-  document.getElementById("archiveBtn")?.addEventListener("click", openArchiveModal);
-}
-
-function openArchiveModal() {
-  const modal = document.getElementById("archiveModal");
-  const content = document.getElementById("archiveContent");
-  if (!modal || !content) return;
-
-  content.innerHTML = '<p class="archive-empty">Loading…</p>';
-  modal.classList.remove("hidden");
-
-  fetch("/api/archive")
-    .then(r => r.json())
-    .then(data => {
-      if (!data.cards || data.cards.length === 0) {
-        content.innerHTML = '<p class="archive-empty">No archived cards.</p>';
-        return;
-      }
-
-      const byBoard = {};
-      for (const card of data.cards) {
-        if (!byBoard[card.board_id]) byBoard[card.board_id] = { name: card.board_name, cards: [] };
-        byBoard[card.board_id].cards.push(card);
-      }
-
-      content.innerHTML = "";
-      for (const group of Object.values(byBoard)) {
-        const section = document.createElement("div");
-        section.className = "archive-board-group";
-
-        const heading = document.createElement("div");
-        heading.className = "archive-board-name";
-        heading.textContent = group.name;
-        section.appendChild(heading);
-
-        for (const card of group.cards) {
-          const item = document.createElement("div");
-          item.className = "archive-card-item";
-          if (card.color) item.style.borderLeftColor = card.color;
-
-          const info = document.createElement("div");
-          info.className = "archive-card-info";
-          info.innerHTML = `<strong>${escHtml(card.title)}</strong><span class="archive-card-col">in ${escHtml(card.column_name)}</span>`;
-
-          const actions = document.createElement("div");
-          actions.className = "archive-card-actions";
-
-          const restoreBtn = document.createElement("button");
-          restoreBtn.type = "button";
-          restoreBtn.className = "flat-btn";
-          restoreBtn.textContent = "Restore";
-          restoreBtn.addEventListener("click", async () => {
-            try {
-              await postJSON(`/cards/${card.id}/restore`);
-              item.remove();
-              showToast("Card restored.", "success");
-              setTimeout(() => window.location.reload(), 800);
-            } catch (err) { showToast(err.message); }
-          });
-
-          const deleteBtn = document.createElement("button");
-          deleteBtn.type = "button";
-          deleteBtn.className = "flat-btn danger";
-          deleteBtn.textContent = "Delete";
-          deleteBtn.addEventListener("click", async () => {
-            if (!confirm("Permanently delete this card?")) return;
-            try {
-              await postJSON(`/cards/${card.id}/delete`);
-              item.remove();
-              if (content.querySelectorAll(".archive-card-item").length === 0) {
-                content.innerHTML = '<p class="archive-empty">No archived cards.</p>';
-              }
-              showToast("Card deleted.", "success");
-            } catch (err) { showToast(err.message); }
-          });
-
-          actions.appendChild(restoreBtn);
-          actions.appendChild(deleteBtn);
-          item.appendChild(info);
-          item.appendChild(actions);
-          section.appendChild(item);
-        }
-        content.appendChild(section);
-      }
-    })
-    .catch(() => {
-      content.innerHTML = '<p class="archive-empty">Failed to load archive.</p>';
-    });
-}
-
-function wireArchiveModal() {
-  const modal = document.getElementById("archiveModal");
-  if (!modal) return;
-  document.getElementById("closeArchiveModal")?.addEventListener("click", () => modal.classList.add("hidden"));
-  modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
-}
-
-// --------------------
 // EDIT MODAL
 // --------------------
 
@@ -682,7 +754,6 @@ function wireEditModal() {
     if (e.key === "Escape" && !modal.classList.contains("hidden")) closeModal();
   });
 
-  // Add checklist item
   const addChecklistBtn = document.getElementById("addChecklistBtn");
   const newChecklistText = document.getElementById("newChecklistText");
 
@@ -707,7 +778,6 @@ function wireEditModal() {
     if (e.key === "Enter") { e.preventDefault(); doAddChecklistItem(); }
   });
 
-  // Archive from modal
   document.getElementById("archiveFromModal")?.addEventListener("click", async () => {
     if (!editingCardEl) return;
     const cardId = document.getElementById("editCardId").value;
@@ -721,17 +791,6 @@ function wireEditModal() {
     } catch (err) { showToast(err.message); }
   });
 
-  // Delete account
-  document.getElementById("deleteAccountBtn")?.addEventListener("click", async () => {
-    if (!confirm("Permanently delete your account and all data? This cannot be undone.")) return;
-    if (!confirm("Are you sure? Everything will be gone forever.")) return;
-    try {
-      await postJSON("/account/delete");
-      window.location.href = "/login";
-    } catch (err) { showToast(err.message); }
-  });
-
-  // Save card
   editForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const cardId = document.getElementById("editCardId").value;
@@ -891,9 +950,10 @@ function wireTouchDrag(cardEl) {
 // --------------------
 
 function initPage() {
-  wireAddBoardForm();
-  wireArchiveBtn();
+  wireMenu();
+  wireSettingsModal();
   wireArchiveModal();
+  wireEditModal();
 
   document.querySelectorAll(".board-section").forEach(wireBoardControls);
   document.querySelectorAll(".board-col-form").forEach(wireAddColumnForm);
@@ -906,7 +966,6 @@ function initPage() {
 
   document.querySelectorAll(".add-card-form").forEach(wireAddCardForm);
   document.querySelectorAll(".card").forEach(wireCard);
-  wireEditModal();
 }
 
 initPage();

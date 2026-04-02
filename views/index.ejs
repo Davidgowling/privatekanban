@@ -8,24 +8,69 @@
 </head>
 <body>
   <header class="topbar">
+    <!-- Left: hamburger menu -->
     <div class="topbar-left">
-      <div class="app-logo">&#8801;</div>
-      <div>
-        <h1>Kanban</h1>
-        <p class="app-sub">Signed in as <strong><%= currentUser %></strong></p>
+      <div class="menu-trigger" id="menuTrigger">
+        <div class="hamburger-icon">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <span class="menu-caret">&#9662;</span>
+      </div>
+
+      <div class="dropdown hidden" id="mainMenu">
+        <div class="menu-section">
+          <div class="menu-user">
+            <div class="menu-user-name"><%= currentUser %></div>
+            <div class="menu-user-sub">Signed in</div>
+          </div>
+        </div>
+        <div class="menu-section">
+          <div class="menu-item" id="menuAddBoard">
+            <span class="menu-icon">+</span>
+            Add board
+          </div>
+          <div class="menu-add-board-form hidden" id="menuAddBoardForm">
+            <input type="text" id="newBoardName" class="menu-input" placeholder="Board name…" />
+            <div class="menu-form-btns">
+              <button type="button" class="flat-btn" id="menuAddBoardSubmit">Add</button>
+              <button type="button" class="flat-btn muted" id="menuAddBoardCancel">Cancel</button>
+            </div>
+          </div>
+        </div>
+        <div class="menu-section">
+          <div class="menu-item" id="menuArchive">
+            <span class="menu-icon">&#9783;</span>
+            Archive
+          </div>
+        </div>
+        <div class="menu-section">
+          <div class="menu-item" id="menuSettings">
+            <span class="menu-icon">&#9881;</span>
+            Settings
+          </div>
+          <form method="POST" action="/logout">
+            <button type="submit" class="menu-item menu-item-btn">
+              <span class="menu-icon">&#8594;</span>
+              Logout
+            </button>
+          </form>
+        </div>
       </div>
     </div>
+
+    <!-- Right: logo -->
     <div class="topbar-right">
-      <form id="addBoardForm" class="topbar-form">
-        <input type="text" id="newBoardName" class="flat-input" placeholder="New board name" required />
-        <button type="submit" class="flat-btn">Add board</button>
-      </form>
-      <div class="topbar-divider"></div>
-      <button type="button" class="flat-btn muted" id="archiveBtn">Archive</button>
-      <div class="topbar-divider"></div>
-      <form method="POST" action="/logout">
-        <button type="submit" class="flat-btn muted">Logout</button>
-      </form>
+      <span class="app-title">Kanban</span>
+      <svg class="app-logo-svg" width="32" height="32" viewBox="0 0 48 48">
+        <rect width="48" height="48" rx="11" fill="#1e1b4b"/>
+        <rect x="10" y="22" width="28" height="13" rx="3" fill="#a855f7" opacity="0.5"/>
+        <rect x="10" y="15" width="28" height="13" rx="3" fill="#6366f1" opacity="0.8"/>
+        <rect x="10" y="8"  width="28" height="13" rx="3" fill="white"/>
+        <rect x="14" y="11" width="8" height="2" rx="1" fill="#6366f1" opacity="0.5"/>
+        <rect x="14" y="18" width="12" height="2" rx="1" fill="#a5b4fc" opacity="0.5"/>
+      </svg>
     </div>
   </header>
 
@@ -138,7 +183,7 @@
     <% if (boards.length === 0) { %>
       <div class="empty-state">
         <p>No boards yet.</p>
-        <p class="app-sub">Type a board name above and click Add board to get started.</p>
+        <p class="app-sub">Open the menu and click Add board to get started.</p>
       </div>
     <% } %>
   </main>
@@ -176,7 +221,6 @@
           </label>
         </div>
 
-        <!-- Checklist -->
         <div class="checklist-section">
           <div class="checklist-header">
             <span class="checklist-title">Checklist</span>
@@ -198,9 +242,24 @@
           <button type="button" id="closeModal" class="flat-btn muted">Cancel</button>
         </div>
       </form>
-      <div class="danger-zone">
-        <p>Permanently delete your account and all data.</p>
+    </div>
+  </div>
+
+  <!-- Settings modal -->
+  <div id="settingsModal" class="modal hidden">
+    <div class="modal-card">
+      <h3>Settings</h3>
+      <div class="settings-section">
+        <div class="settings-label">Account</div>
+        <p class="settings-desc">Signed in as <strong><%= currentUser %></strong></p>
+      </div>
+      <div class="settings-section settings-danger">
+        <div class="settings-label danger">Danger zone</div>
+        <p class="settings-desc">Permanently delete your account and all your boards, columns and cards. This cannot be undone.</p>
         <button type="button" id="deleteAccountBtn" class="flat-btn danger">Delete my account</button>
+      </div>
+      <div class="modal-actions" style="margin-top:20px;">
+        <button type="button" id="closeSettings" class="flat-btn muted">Close</button>
       </div>
     </div>
   </div>
