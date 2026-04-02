@@ -102,7 +102,6 @@ function wireMenu() {
     }
   });
 
-  // Add board in menu
   const addBoardItem = document.getElementById("menuAddBoard");
   const addBoardForm = document.getElementById("menuAddBoardForm");
   const addBoardSubmit = document.getElementById("menuAddBoardSubmit");
@@ -144,13 +143,11 @@ function wireMenu() {
     if (e.key === "Escape") resetAddBoardForm();
   });
 
-  // Archive
   document.getElementById("menuArchive")?.addEventListener("click", () => {
     menu.classList.add("hidden");
     openArchiveModal();
   });
 
-  // Settings
   document.getElementById("menuSettings")?.addEventListener("click", () => {
     menu.classList.add("hidden");
     document.getElementById("settingsModal")?.classList.remove("hidden");
@@ -209,7 +206,6 @@ function openArchiveModal() {
         return;
       }
 
-      // Group by board
       const byBoard = {};
       for (const card of data.cards) {
         if (!byBoard[card.board_id]) byBoard[card.board_id] = { name: card.board_name, cards: [] };
@@ -248,7 +244,6 @@ function openArchiveModal() {
               await postJSON(`/cards/${card.id}/restore`);
               item.remove();
               showToast("Card restored.", "success");
-              // Reload so the card appears in the correct column
               setTimeout(() => window.location.reload(), 800);
             } catch (err) { showToast(err.message); }
           });
@@ -528,6 +523,7 @@ function wireBoardDrag(boardEl) {
     draggingBoard = boardEl;
     e.dataTransfer.effectAllowed = "move";
     boardEl.classList.add("board-dragging");
+    document.body.classList.add("is-dragging");
     requestAnimationFrame(() => boardEl.style.opacity = "0.4");
   });
 
@@ -536,6 +532,7 @@ function wireBoardDrag(boardEl) {
     draggingBoard = null;
     boardEl.classList.remove("board-dragging");
     boardEl.style.opacity = "";
+    document.body.classList.remove("is-dragging");
     commitBoardReorder();
   });
 }
@@ -625,6 +622,7 @@ function wireColumnDrag(columnEl) {
     draggingColumn = columnEl;
     e.dataTransfer.effectAllowed = "move";
     columnEl.classList.add("col-dragging");
+    document.body.classList.add("is-dragging");
     requestAnimationFrame(() => columnEl.style.opacity = "0.4");
   });
 
@@ -634,6 +632,7 @@ function wireColumnDrag(columnEl) {
     draggingColumn = null;
     columnEl.classList.remove("col-dragging");
     columnEl.style.opacity = "";
+    document.body.classList.remove("is-dragging");
     commitColumnReorder(grid);
   });
 }
@@ -710,8 +709,16 @@ function wireCard(cardEl) {
     } catch (err) { showToast(err.message); }
   });
 
-  cardEl.addEventListener("dragstart", () => cardEl.classList.add("dragging"));
-  cardEl.addEventListener("dragend", () => cardEl.classList.remove("dragging"));
+  cardEl.addEventListener("dragstart", () => {
+    cardEl.classList.add("dragging");
+    document.body.classList.add("is-dragging");
+  });
+
+  cardEl.addEventListener("dragend", () => {
+    cardEl.classList.remove("dragging");
+    document.body.classList.remove("is-dragging");
+  });
+
   wireTouchDrag(cardEl);
 }
 
@@ -873,7 +880,6 @@ function openEditModal(cardEl) {
   const colorSelect = document.getElementById("editColor");
   if (colorSelect) colorSelect.value = cardEl.style.borderLeftColor ? rgbToHex(cardEl.style.borderLeftColor) : "";
 
-  // Load checklist
   try {
     currentChecklistItems = JSON.parse(cardEl.dataset.checklist || "[]");
   } catch (_) {
@@ -882,7 +888,6 @@ function openEditModal(cardEl) {
   renderChecklistItems(currentChecklistItems);
   updateChecklistProgress(currentChecklistItems);
 
-  // Clear add input
   const addInput = document.getElementById("newChecklistText");
   if (addInput) addInput.value = "";
 
@@ -907,7 +912,6 @@ function wireEditModal() {
     if (e.key === "Escape" && !modal.classList.contains("hidden")) closeModal();
   });
 
-  // Add checklist item
   const addChecklistBtn = document.getElementById("addChecklistBtn");
   const newChecklistText = document.getElementById("newChecklistText");
 
@@ -933,7 +937,6 @@ function wireEditModal() {
     if (e.key === "Enter") { e.preventDefault(); doAddChecklistItem(); }
   });
 
-  // Archive from modal
   document.getElementById("archiveFromModal")?.addEventListener("click", async () => {
     if (!editingCardEl) return;
     const cardId = document.getElementById("editCardId").value;
@@ -947,7 +950,6 @@ function wireEditModal() {
     } catch (err) { showToast(err.message); }
   });
 
-  // Permanent delete from modal
   document.getElementById("deletePermFromModal")?.addEventListener("click", async () => {
     if (!confirm("Permanently delete this card? This cannot be undone.")) return;
     const cardId = document.getElementById("editCardId").value;
@@ -961,7 +963,6 @@ function wireEditModal() {
     } catch (err) { showToast(err.message); }
   });
 
-  // Save card
   editForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const cardId = document.getElementById("editCardId").value;

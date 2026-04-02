@@ -1047,3 +1047,9 @@ h2.board-title {
   font-size: 12px;
   padding: 20px 0;
 }
+
+/* Force grabbing cursor on entire page during drag */
+body.is-dragging,
+body.is-dragging * {
+  cursor: grabbing !important;
+}
