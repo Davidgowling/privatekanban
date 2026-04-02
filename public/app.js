@@ -523,7 +523,6 @@ function wireBoardDrag(boardEl) {
     draggingBoard = boardEl;
     e.dataTransfer.effectAllowed = "move";
     boardEl.classList.add("board-dragging");
-    document.body.classList.add("is-dragging");
     requestAnimationFrame(() => boardEl.style.opacity = "0.4");
   });
 
@@ -532,7 +531,6 @@ function wireBoardDrag(boardEl) {
     draggingBoard = null;
     boardEl.classList.remove("board-dragging");
     boardEl.style.opacity = "";
-    document.body.classList.remove("is-dragging");
     commitBoardReorder();
   });
 }
@@ -622,7 +620,6 @@ function wireColumnDrag(columnEl) {
     draggingColumn = columnEl;
     e.dataTransfer.effectAllowed = "move";
     columnEl.classList.add("col-dragging");
-    document.body.classList.add("is-dragging");
     requestAnimationFrame(() => columnEl.style.opacity = "0.4");
   });
 
@@ -632,7 +629,6 @@ function wireColumnDrag(columnEl) {
     draggingColumn = null;
     columnEl.classList.remove("col-dragging");
     columnEl.style.opacity = "";
-    document.body.classList.remove("is-dragging");
     commitColumnReorder(grid);
   });
 }
@@ -709,22 +705,9 @@ function wireCard(cardEl) {
     } catch (err) { showToast(err.message); }
   });
 
-  // KEY FIX: use dragend to commit the move — dragend always fires reliably
-  // dragover moves the card visually, dragend reads its new position and saves it
-  cardEl.addEventListener("dragstart", (e) => {
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", cardEl.dataset.cardId);
-    requestAnimationFrame(() => cardEl.classList.add("dragging"));
-    document.body.classList.add("is-dragging");
-  });
-
-  cardEl.addEventListener("dragend", async () => {
-    cardEl.classList.remove("dragging");
-    document.body.classList.remove("is-dragging");
-    // Card is already in its new DOM position from dragover — just commit it
-    const list = cardEl.closest(".card-list");
-    if (list) await commitCardMove(cardEl, list);
-  });
+  // Plain dragstart/dragend — no extras, this is what worked originally
+  cardEl.addEventListener("dragstart", () => cardEl.classList.add("dragging"));
+  cardEl.addEventListener("dragend", () => cardEl.classList.remove("dragging"));
 
   wireTouchDrag(cardEl);
 }
@@ -1027,22 +1010,26 @@ function wireEditModal() {
 
 // --------------------
 // MOUSE DRAG AND DROP (CARDS)
+// Restored to original working implementation — plain dragover + drop
 // --------------------
-
-// dragover moves the card visually into its new position in the DOM.
-// dragend then reads where the card ended up and commits it to the server.
-// This is more reliable than using the drop event which can fail to fire.
 
 function wireDragTarget(listEl) {
   listEl.addEventListener("dragover", (e) => {
     if (draggingColumn || draggingBoard) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
     const dragging = document.querySelector(".dragging");
     if (!dragging) return;
     const after = getDragAfterElement(listEl, e.clientY);
     if (after == null) listEl.appendChild(dragging);
     else listEl.insertBefore(dragging, after);
+  });
+
+  listEl.addEventListener("drop", async (e) => {
+    if (draggingColumn || draggingBoard) return;
+    e.preventDefault();
+    const dragging = document.querySelector(".dragging");
+    if (!dragging) return;
+    await commitCardMove(dragging, listEl);
   });
 }
 
@@ -1085,12 +1072,17 @@ function wireTouchDrag(cardEl) {
 
     touchClone = cardEl.cloneNode(true);
     touchClone.style.cssText = `
-      position:fixed; width:${rect.width}px;
-      left:${rect.left}px; top:${rect.top}px;
-      opacity:0.85; pointer-events:none; z-index:9999;
-      box-shadow:0 8px 24px rgba(30,27,75,0.18);
-      border-radius:5px; background:#fff;
-      transform:rotate(1deg);
+      position: fixed;
+      width: ${rect.width}px;
+      left: ${rect.left}px;
+      top: ${rect.top}px;
+      opacity: 0.85;
+      pointer-events: none;
+      z-index: 9999;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+      border-radius: 5px;
+      background: #fff;
+      transform: rotate(1deg);
     `;
     document.body.appendChild(touchClone);
     cardEl.classList.add("dragging");
